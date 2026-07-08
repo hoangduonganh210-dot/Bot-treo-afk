@@ -44,29 +44,14 @@ function startBot() {
       bot.chat(`/dn ${PASSWORD}`)
       console.log(`[1/3] Đã gửi lệnh đăng nhập: /dn ******`)
       
-      // BƯỚC 2: Chờ 4 giây đăng nhập xong, cầm Đồng hồ trên tay và Chuột phải để mở Menu
+      // BƯỚC 2: Chờ 4 giây đăng nhập xong, click chuột phải luôn vì đồng hồ đã cầm sẵn trên tay
       setTimeout(() => {
-        console.log('[2/3] Đang chuẩn bị mở Menu bằng vật phẩm...');
+        console.log('[2/3] Thực hiện bấm chuột phải vào Đồng hồ trên tay để mở Menu...');
         
-        // Tìm item Đồng hồ (clock) trong túi đồ
-        const menuItem = bot.inventory.items().find(item => item.name.includes('clock'))
+        // Kích hoạt vật phẩm đang cầm trên tay (Chuột phải)
+        bot.activateItem()
+        console.log('-> Đã click chuột phải mở Menu Server!')
         
-        if (menuItem) {
-          // Cầm đồng hồ lên tay chính
-          bot.equip(menuItem, 'hand', (err) => {
-            if (err) {
-              console.log('Lỗi khi cầm đồng hồ:', err.message)
-              return
-            }
-            // Thực hiện hành động chuột phải vào không khí để mở Menu
-            bot.activateItem()
-            console.log('-> Đã click chuột phải mở Menu Server!')
-          })
-        } else {
-          // Phòng trường hợp không thấy đồng hồ, bot sẽ tự gõ lệnh thay thế (nếu server hỗ trợ)
-          console.log('Không tìm thấy Đồng hồ trong túi đồ, thử gõ /menu hoặc /server...')
-          bot.chat('/menu') 
-        }
       }, 4000)
 
     }, 5000)
@@ -88,17 +73,14 @@ function startBot() {
   bot.on('windowOpen', async (window) => {
     console.log('[3/3] Giao diện Menu đã mở. Đang tìm kiếm cụm KingSMP...')
     
-    // Chờ 1 giây để các vật phẩm trong Menu tải xong hoàn toàn
+    // Chờ 1 giây để giao diện đồng bộ vật phẩm ổn định
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Tìm khối đất nung màu đỏ (red_terracotta) hoặc vật phẩm có chứa chữ "King5MP" / "kingsmp" trong mô tả (lore)
+    // Tìm ô chứa khối Đất nung đỏ (red_terracotta) hoặc có tên chứa chữ "King"
     const slotToClick = window.slots.find(item => {
       if (!item) return false
       
-      // Cách 1: Tìm theo tên hệ thống của vật phẩm (Khối đất nung đỏ)
       const isRedTerracotta = item.name.includes('red_terracotta') || item.name.includes('hardened_clay')
-      
-      // Cách 2: Tìm theo thông tin hiển thị (nếu cách 1 thay đổi vật phẩm)
       const hasKingSMPName = item.customName && item.customName.includes('King')
       
       return isRedTerracotta || hasKingSMPName
@@ -107,7 +89,7 @@ function startBot() {
     if (slotToClick) {
       console.log(`-> Tìm thấy cụm KingSMP tại ô số: ${slotToClick.slot}. Tiến hành Click!`)
       
-      // Click chuột trái (button: 0, mode: 0) vào ô vật phẩm đó
+      // Click chuột trái vào ô vật phẩm đó để vào cụm
       bot.clickWindow(slotToClick.slot, 0, 0, (err) => {
         if (err) console.log('Lỗi khi click vào Menu:', err.message)
         else console.log('=== CHÚC MỪNG: BOT ĐÃ CLICK VÀO CỔNG KINGSMP THÀNH CÔNG! ===')
