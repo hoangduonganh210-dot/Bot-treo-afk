@@ -1,29 +1,24 @@
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-// Mật khẩu chính xác của cả 2 tài khoản
 const PASSWORD = 'TrinhHoangYen' 
 
-// BẮT BUỘC CHO RENDER: Chỉ tạo một server web ảo duy nhất để tránh lỗi trùng cổng (Crash)
+// Tạo web server ảo cho Render duy trì hoạt động
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('He thong 2 Bot AFK (coolgau & HDATHY) dang hoat dong binh thuong!')
+  res.end('Bot AFK dang hoat dong binh thuong!')
 }).listen(PORT, () => {
   console.log(`[Render] Web server mo tren cong ${PORT}`)
 })
 
-
-// =================================================================
-// TÀI KHOẢN 1: coolgau
-// =================================================================
-function startBotCoolgau() {
-  console.log('=== TRẠNG THÁI: [coolgau] ĐANG KẾT NỐI TỚI SERVER... ===')
+function startBot() {
+  console.log('=== TRẠNG THÁI: ĐANG KẾT NỐI TỚI SERVER VỚI TÊN HDATHY... ===')
   
   const bot = mineflayer.createBot({
     host: 'sgp.kingmc.vn', 
     port: 25565,
-    username: 'coolgau', 
+    username: 'coolgau', // ĐÃ ĐỔI THÀNH TÊN COOLGAU THEO YÊU CẦU
     version: '1.20.4', 
     auth: 'offline',
     connectTimeout: 60000, 
@@ -37,7 +32,7 @@ function startBotCoolgau() {
   let menuOpened = false
 
   bot.on('login', () => {
-    console.log('=== TRẠNG THÁI: [coolgau] KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
+    console.log('=== TRẠNG THÁI: KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
   })
 
   bot.on('spawn', () => {
@@ -45,245 +40,107 @@ function startBotCoolgau() {
     hasLoggedIn = true
     menuOpened = false
 
-    console.log('=== [coolgau] ĐÀ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP... ===')
+    console.log('=== ĐÃ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP AN TOÀN... ===')
     
-    // Đăng nhập an toàn sau 4 giây
+    // Đăng nhập thong thả sau 5 giây để tránh bị Anti-bot quét tốc độ
     setTimeout(() => {
       bot.chat(`/dn ${PASSWORD}`)
-      console.log('-> [coolgau] Đã gửi lệnh đăng nhập lần đầu.')
-    }, 4000)
+      console.log('-> Đã gửi lệnh đăng nhập lần đầu.')
+    }, 5000)
 
-    // Nhắc lại lệnh đăng nhập phòng lag
+    // Giãn cách thời gian nhắc lại lệnh đăng nhập lên 6 giây an toàn
     loginInterval = setInterval(() => {
       if(!hasLoggedIn || menuOpened) return;
       bot.chat(`/dn ${PASSWORD}`)
-    }, 5000)
+    }, 6000)
 
-    // Chờ 10 giây để sảnh chính tải xong thế giới
+    // Chờ hẳn 12 giây để sảnh chính đồng bộ hoàn toàn rồi mới kích hoạt Menu
     setTimeout(() => {
       if (loginInterval) clearInterval(loginInterval)
-      console.log('=== [coolgau] SẢNH ỔN ĐỊNH: TIẾN HÀNH MỚ MENU CHỌN SERVER... ===')
+      console.log('=== SẢNH ỔN ĐỊNH: ÉP LỆNH MỞ MENU CHỌN SERVER... ===')
       
       bot.activateItem() 
       bot.chat('/menu')
       bot.chat('/server')
 
-      // Vòng lặp kiểm tra: Cứ mỗi 5 giây nếu thấy Menu chưa mở, bot sẽ tự gõ lại lệnh để kích hoạt
+      // Kiểm tra định kỳ mỗi 6 giây nếu Menu lỗi chưa mở thì gửi lại lệnh
       menuInterval = setInterval(() => {
         if (!menuOpened && hasLoggedIn) {
-          console.log('⚠️ [coolgau] Phát hiện Menu chưa mở thành công, đang thử gõ lại lệnh kích hoạt...');
+          console.log('⚠️ Menu chưa mở, đang gửi lại lệnh kích hoạt...');
           bot.activateItem()
           bot.chat('/menu')
-          bot.chat('/server')
         }
-      }, 5000)
+      }, 6000)
 
-    }, 10000)
+    }, 12000)
 
-    // Chu kỳ AFK chủ động giả lập đi lại
+    // NÂNG CẤP: Chu kỳ Anti-AFK nâng cao (Di chuyển đổi góc 90 độ thực tế)
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
-      bot.setControlState('jump', true)
-      setTimeout(() => bot.setControlState('jump', false), 500)
       
-      const yaw = Math.random() * Math.PI * 2
-      const pitch = (Math.random() - 0.5) * Math.PI * 0.5
-      bot.look(yaw, pitch)
-
+      // 1. Nhảy lên
+      bot.setControlState('jump', true)
+      setTimeout(() => bot.setControlState('jump', false), 400)
+      
+      // 2. Đi tiến 0.8 giây
       bot.setControlState('forward', true)
       setTimeout(() => {
         bot.setControlState('forward', false)
-        bot.setControlState('back', true)
-        setTimeout(() => bot.setControlState('back', false), 600)
-      }, 600)
-    }, 25000) 
+        
+        // Xoay góc nhìn sang phải 90 độ ngẫu nhiên
+        const yaw = bot.entity.yaw + (Math.PI / 2) * (Math.random() > 0.5 ? 1 : -1)
+        bot.look(yaw, 0, true)
+        
+        // 3. Đi ngang (sang phải hoặc trái) để dịch chuyển vị trí thực tế trên block
+        bot.setControlState('right', true)
+        setTimeout(() => {
+          bot.setControlState('right', false)
+        }, 700)
+      }, 800)
+
+    }, 25000) // 25 giây thực hiện một chuỗi di chuyển thật
   })
 
-  // Xử lý khi Giao diện rương (Menu) được kích hoạt thành công
+  // Xử lý click ô số 25 khi Menu mở
   bot.on('windowOpen', async (window) => {
     menuOpened = true
     if (menuInterval) clearInterval(menuInterval)
     
-    console.log('=== [coolgau] THÀNH CÔNG: MENU ĐÃ MỞ! ĐANG CHỜ TẢI VẬT PHẨM... ===')
-    
-    // Chờ ổn định 3.5 giây để tránh lỗi click vào ô trống rỗng
-    await new Promise(resolve => setTimeout(resolve, 3500))
+    console.log('=== MENU ĐÃ MỞ! CHỜ 4 GIÂY ĐỂ ĐỒNG BỘ ĐẦU NGƯỜI CHƠI... ===')
+    await new Promise(resolve => setTimeout(resolve, 4000))
 
-    const TARGET_SLOT = 24 // Ô số 25 trong game (Tính từ số 0)
+    const TARGET_SLOT = 24 // Ô số 25 trong game
     
-    console.log(`-> [coolgau] Thực hiện click chuột trái vào ô số 25 (Slot ID: ${TARGET_SLOT})`)
+    console.log(`-> Tiến hành click chuột trái vào ô số 25 (Slot ID: ${TARGET_SLOT})`)
     
     bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
       if (err) {
-        console.log('[coolgau LỖI CLICK]:', err.message)
-        bot.chat('/server kingsmp')
+        console.log('[LỖI CLICK]:', err.message)
+        bot.chat('/server kingsmp') // Dự phòng gõ lệnh chat thẳng nếu click lỗi
       } else {
-        console.log('=== [coolgau] HOÀN THÀNH: ĐÃ CLICK VÀO Ô 25 ĐỂ VÀO KINGSMP! ===')
+        console.log('=== HOÀN THÀNH: ĐÃ CLICK VÀO Ô 25 ĐỂ VÀO KINGSMP! ===')
       }
     })
   })
 
   bot.on('kicked', (reason) => {
-    console.log('[coolgau] Bot bị kick khỏi server. Lý do:', JSON.stringify(reason))
+    console.log('Bot bị kick khỏi server. Lý do:', JSON.stringify(reason))
   })
 
   bot.on('error', (err) => {
-    console.log('[coolgau] Lỗi mạng phát sinh:', err.message)
+    console.log('Lỗi mạng phát sinh:', err.message)
   })
 
   bot.on('end', () => {
-    console.log('[coolgau] Mất kết nối. Đang tự động kết nối lại sau 40 giây...')
+    console.log('Mất kết nối mạng. Đang tự động kết nối lại sau 45 giây để reset hoàn toàn IP/Session...')
     hasLoggedIn = false 
     menuOpened = false
     if (loginInterval) clearInterval(loginInterval)
     if (menuInterval) clearInterval(menuInterval)
     if (afkInterval) clearInterval(afkInterval)
-    setTimeout(startBotCoolgau, 40000) 
+    setTimeout(startBot, 45000) // Tăng lên 45 giây để tránh bị dính spam rate-limit của cổng game
   })
 }
 
-
-// =================================================================
-// TÀI KHOẢN 2: HDATHY
-// =================================================================
-function startBotHdathy() {
-  console.log('=== TRẠNG THÁI: [HDATHY] ĐANG KẾT NỐI TỚI SERVER... ===')
-  
-  const bot = mineflayer.createBot({
-    host: 'sgp.kingmc.vn', 
-    port: 25565,
-    username: 'HDATHY', 
-    version: '1.20.4', 
-    auth: 'offline',
-    connectTimeout: 60000, 
-    timeout: 60000 
-  })
-
-  let afkInterval
-  let loginInterval
-  let menuInterval
-  let hasLoggedIn = false
-  let menuOpened = false
-
-  bot.on('login', () => {
-    console.log('=== TRẠNG THÁI: [HDATHY] KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
-  })
-
-  bot.on('spawn', () => {
-    if (hasLoggedIn) return
-    hasLoggedIn = true
-    menuOpened = false
-
-    console.log('=== [HDATHY] ĐÀ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP... ===')
-    
-    // Đăng nhập an toàn sau 4 giây
-    setTimeout(() => {
-      bot.chat(`/dn ${PASSWORD}`)
-      console.log('-> [HDATHY] Đã gửi lệnh đăng nhập lần đầu.')
-    }, 4000)
-
-    // Nhắc lại lệnh đăng nhập phòng lag
-    loginInterval = setInterval(() => {
-      if(!hasLoggedIn || menuOpened) return;
-      bot.chat(`/dn ${PASSWORD}`)
-    }, 5000)
-
-    // Chờ 10 giây để sảnh chính tải xong thế giới
-    setTimeout(() => {
-      if (loginInterval) clearInterval(loginInterval)
-      console.log('=== [HDATHY] SẢNH ỔN ĐỊNH: TIẾN HÀNH MỚ MENU CHỌN SERVER... ===')
-      
-      bot.activateItem() 
-      bot.chat('/menu')
-      bot.chat('/server')
-
-      // Vòng lặp kiểm tra: Cứ mỗi 5 giây nếu thấy Menu chưa mở, bot sẽ tự gõ lại lệnh để kích hoạt
-      menuInterval = setInterval(() => {
-        if (!menuOpened && hasLoggedIn) {
-          console.log('⚠️ [HDATHY] Phát hiện Menu chưa mở thành công, đang thử gõ lại lệnh kích hoạt...');
-          bot.activateItem()
-          bot.chat('/menu')
-          bot.chat('/server')
-        }
-      }, 5000)
-
-    }, 10000)
-
-    // Chu kỳ AFK chủ động giả lập đi lại
-    if (afkInterval) clearInterval(afkInterval)
-    afkInterval = setInterval(() => {
-      if (!bot.entity) return
-      bot.setControlState('jump', true)
-      setTimeout(() => bot.setControlState('jump', false), 500)
-      
-      const yaw = Math.random() * Math.PI * 2
-      const pitch = (Math.random() - 0.5) * Math.PI * 0.5
-      bot.look(yaw, pitch)
-
-      bot.setControlState('forward', true)
-      setTimeout(() => {
-        bot.setControlState('forward', false)
-        bot.setControlState('back', true)
-        setTimeout(() => bot.setControlState('back', false), 600)
-      }, 600)
-    }, 25000) 
-  })
-
-  // Xử lý khi Giao diện rương (Menu) được kích hoạt thành công
-  bot.on('windowOpen', async (window) => {
-    menuOpened = true
-    if (menuInterval) clearInterval(menuInterval)
-    
-    console.log('=== [HDATHY] THÀNH CÔNG: MENU ĐÃ MỞ! ĐANG CHỜ TẢI VẬT PHẨM... ===')
-    
-    // Chờ ổn định 3.5 giây để tránh lỗi click vào ô trống rỗng
-    await new Promise(resolve => setTimeout(resolve, 3500))
-
-    const TARGET_SLOT = 24 // Ô số 25 trong game (Tính từ số 0)
-    
-    console.log(`-> [HDATHY] Thực hiện click chuột trái vào ô số 25 (Slot ID: ${TARGET_SLOT})`)
-    
-    bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
-      if (err) {
-        console.log('[HDATHY LỖI CLICK]:', err.message)
-        bot.chat('/server kingsmp')
-      } else {
-        console.log('=== [HDATHY] HOÀN THÀNH: ĐÃ CLICK VÀO Ô 25 ĐỂ VÀO KINGSMP! ===')
-      }
-    })
-  })
-
-  bot.on('kicked', (reason) => {
-    console.log('[HDATHY] Bot bị kick khỏi server. Lý do:', JSON.stringify(reason))
-  })
-
-  bot.on('error', (err) => {
-    console.log('[HDATHY] Lỗi mạng phát sinh:', err.message)
-  })
-
-  bot.on('end', () => {
-    console.log('[HDATHY] Mất kết nối. Đang tự động kết nối lại sau 40 giây...')
-    hasLoggedIn = false 
-    menuOpened = false
-    if (loginInterval) clearInterval(loginInterval)
-    if (menuInterval) clearInterval(menuInterval)
-    if (afkInterval) clearInterval(afkInterval)
-    setTimeout(startBotHdathy, 40000) 
-  })
-}
-
-
-// =================================================================
-// KÍCH HOẠT CHẠY 2 TÀI KHOẢN ĐỒNG THỜI
-// =================================================================
-
-// 1. Bật tài khoản coolgau ngay lập tức
-startBotCoolgau() 
-
-// 2. Chờ đúng 15 giây sau mới bật tiếp tài khoản HDATHY
-// Việc giãn cách này giúp 2 tài khoản không gửi gói tin cùng lúc,
-// tránh bị hệ thống Anti-bot của server khóa IP mạng Render.
-setTimeout(() => {
-  startBotHdathy()
-}, 15000)
+startBot()
