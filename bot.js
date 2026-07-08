@@ -7,57 +7,42 @@ function startBot() {
   console.log('=== ĐANG KẾT NỐI QUA CỔNG SERVER... ===')
   
   const bot = mineflayer.createBot({
-    host: 'sgp.kingmc.vn',
+    host: 'sgp.kingmc.vn', // Cổng SGP dành cho kết nối quốc tế từ GitHub
     port: 25565,
     username: 'coolgau', 
     version: '1.20.4',
     auth: 'offline',
-    connectTimeout: 30000,
-    timeout: 30000
+    connectTimeout: 45000, // Tăng lên 45 giây cho thoải mái thời gian handshake mạng
+    timeout: 45000
   })
 
   let afkInterval
-  let menuClickInterval // Vòng lặp bấm chuột phải cho đến khi mở được menu
   let hasLoggedIn = false
 
   bot.on('login', () => {
-    console.log('=== BOT ONLINE: ĐÃ VƯỢT TƯỜNG LỬA THÀNH CÔNG ===')
+    console.log('=== BOT ONLINE: KẾT NỐI MẠNG THÀNH CÔNG ===')
   })
 
   bot.on('spawn', () => {
     if (hasLoggedIn) return
     hasLoggedIn = true
 
-    console.log('=== ĐÃ VÀO SẢNH, CHỜ 4 GIÂY ĐỂ ĐĂNG NHẬP... ===')
+    console.log('=== ĐÃ VÀO SẢNH, CHỜ 5 GIÂY ĐỂ ỔN ĐỊNH BẢN ĐỒ... ===')
     
-    // BƯỚC 1: Tự động gõ lệnh /dn
+    // BƯỚC 1: Chờ hẳn 5 giây để map load xong hoàn toàn rồi mới gửi lệnh đăng nhập
     setTimeout(() => {
-      bot.chat(`/dn ${TrinhHoangYen}`)
-      console.log(`[1/3] Đã gửi lệnh: /dn TrinhHoangYen`)
+      bot.chat(`/dn ${PASSWORD}`)
+      console.log(`[1/2] Đã gửi lệnh đăng nhập: /dn ******`)
       
-      // BƯỚC 2: Chờ tiếp 4 giây sau khi đăng nhập rồi tiến hành bấm chuột phải liên tục
+      // BƯỚC 2: Chờ tiếp 4 giây để hệ thống sảnh chuyển bạn vào trạng thái đăng nhập xong
+      // Sau đó gõ lệnh trực tiếp để chuyển thẳng sang cụm KingSMP mà không cần bấm chuột phải
       setTimeout(() => {
-        console.log('[2/3] Bắt đầu chu kỳ quét hotbar và click chuột phải mở Menu...')
-        
-        if (menuClickInterval) clearInterval(menuClickInterval)
-        
-        menuClickInterval = setInterval(() => {
-          // Tìm vật phẩm bất kỳ trong 9 ô hotbar (từ ô số 36 đến 44) để cầm lên tay
-          for (let i = 36; i < 45; i++) {
-            const item = bot.inventory.slots[i]
-            if (item) {
-              bot.setQuickBarSlot(i - 36) // Cầm vật phẩm đó lên tay
-              break
-            }
-          }
-          
-          // Thực hiện hành động chuột phải
-          bot.activateItem() 
-        }, 3000) // Cứ mỗi 3 giây bấm chuột phải 1 lần cho chắc chắn
-
+        console.log('[2/2] Đang gửi lệnh di chuyển thẳng vào cụm KingSMP...')
+        bot.chat('/server kingsmp')
+        console.log('=== CHÚC MỪNG: BOT ĐÃ GỬI LỆNH VÀO SERVER KINGSMP! ===')
       }, 4000)
 
-    }, 4000)
+    }, 5000)
 
     // Khởi động vòng lặp AFK chống bị server kick (Nhảy + Xoay người)
     if (afkInterval) clearInterval(afkInterval)
@@ -72,64 +57,20 @@ function startBot() {
     }, 30000)
   })
 
-  // BƯỚC 3: Tự động tìm và click vào ô "KingSMP" dựa trên Tên hoặc Mô tả (Lore)
-  bot.on('windowOpen', async (window) => {
-    console.log('[3/3] Phát hiện Giao diện Menu đã mở!')
-    
-    // Hủy bỏ vòng lặp bấm chuột phải ngay khi menu đã mở thành công
-    if (menuClickInterval) {
-      clearInterval(menuClickInterval)
-      menuClickInterval = null
-    }
-    
-    // Đợi 500ms để menu tải đầy đủ dữ liệu từ server
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    const items = window.containerItems()
-    let targetSlot = null
-
-    for (const item of items) {
-      let name = item.displayName ? item.displayName.toLowerCase() : ''
-      let lore = ''
-      
-      if (item.nbt && item.nbt.value && item.nbt.value.display && item.nbt.value.display.value.Lore) {
-        try {
-          lore = JSON.stringify(item.nbt.value.display.value.Lore.value).toLowerCase()
-        } catch (e) {
-          lore = ''
-        }
-      }
-
-      name = name.replace(/§[0-9a-fk-or]/g, '')
-      lore = lore.replace(/§[0-9a-fk-or]/g, '')
-
-      if (name.includes('kingsmp') || lore.includes('kingsmp')) {
-        targetSlot = item.slot
-        break
-      }
-    }
-
-    if (targetSlot !== null) {
-      console.log(`-> Tìm thấy biểu tượng KingSMP ở ô số: ${targetSlot}. Đang click...`)
-      try {
-        await bot.clickWindow(targetSlot, 0, 0)
-        console.log('=== CHÚC MỪNG: BOT ĐÃ VÀO SERVER KINGSMP THÀNH CÔNG! ===')
-      } catch (err) {
-        console.log('Lỗi khi tương tác Menu:', err.message)
-      }
-    } else {
-      console.log('Xảy ra lỗi: Không tìm thấy chữ "kingsmp" trong Menu.')
-    }
+  bot.on('kicked', (reason) => {
+    console.log('Bot bị kick hoặc từ chối kết nối. Chi tiết lỗi từ server:')
+    console.log(reason)
   })
 
-  bot.on('kicked', (reason) => console.log('Bot bị kick:', reason))
-  bot.on('error', (err) => console.log('Lỗi mạng:', err.message))
+  bot.on('error', (err) => {
+    console.log('Lỗi hệ thống mạng:', err.message)
+  })
+
   bot.on('end', () => {
-    console.log('Đang kết nối lại sau 5 giây...')
+    console.log('Mất kết nối với server. Đang tự động kết nối lại sau 10 giây...')
     hasLoggedIn = false 
     if (afkInterval) clearInterval(afkInterval)
-    if (menuClickInterval) clearInterval(menuClickInterval)
-    setTimeout(startBot, 5000)
+    setTimeout(startBot, 10000) // Tăng thời gian chờ kết nối lại lên 10 giây để tránh bị firewall quét spam IP
   })
 }
 
