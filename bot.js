@@ -1,9 +1,10 @@
 const mineflayer = require('mineflayer')
 const http = require('http')
 
+// Mật khẩu chính xác của bạn
 const PASSWORD = 'TrinhHoangYen' 
 
-// Tạo web server ảo để duy trì hoạt động liên tục trên Render
+// BẮT BUỘC CHO RENDER: Tạo một server web ảo để Render không quét lỗi tắt bot
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -18,7 +19,7 @@ function startBot() {
   const bot = mineflayer.createBot({
     host: 'sgp.kingmc.vn', 
     port: 25565,
-    username: 'HDATHY', 
+    username: 'HDATHY', // ĐÃ ĐỔI: Tên tài khoản mới của bot
     version: '1.20.4', 
     auth: 'offline',
     connectTimeout: 60000, 
@@ -27,7 +28,9 @@ function startBot() {
 
   let afkInterval
   let loginInterval
+  let menuInterval
   let hasLoggedIn = false
+  let menuOpened = false
 
   bot.on('login', () => {
     console.log('=== TRẠNG THÁI: KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
@@ -36,29 +39,44 @@ function startBot() {
   bot.on('spawn', () => {
     if (hasLoggedIn) return
     hasLoggedIn = true
+    menuOpened = false
 
-    console.log('=== ĐÃ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP AN TOÀN... ===')
+    console.log('=== ĐÃ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP... ===')
     
-    // AN TOÀN: Chờ hẳn 4 giây sau khi spawn mới gõ mật khẩu lần đầu (tránh spam gói tin)
+    // Đăng nhập an toàn sau 4 giây
     setTimeout(() => {
       bot.chat(`/dn ${PASSWORD}`)
       console.log('-> Đã gửi lệnh đăng nhập lần đầu.')
     }, 4000)
 
-    // Tăng thời gian giãn cách kiểm tra lên 5 giây (thay vì 3 giây) để giảm tần suất gửi lệnh
+    // Nhắc lại lệnh đăng nhập phòng lag
     loginInterval = setInterval(() => {
-      if(!hasLoggedIn) return;
+      if(!hasLoggedIn || menuOpened) return;
       bot.chat(`/dn ${PASSWORD}`)
     }, 5000)
 
-    // AN TOÀN: Chờ hẳn 10 giây (thay vì 7 giây) để sảnh chính đồng bộ hoàn toàn rồi mới bấm chuột phải mở Menu
+    // Chờ 10 giây để sảnh chính tải xong thế giới
     setTimeout(() => {
       if (loginInterval) clearInterval(loginInterval)
-      console.log('=== SẢNH ỔN ĐỊNH: BẤM CHUỘT PHẢI MỞ MENU... ===')
-      bot.activateItem()
+      console.log('=== SẢNH ỔN ĐỊNH: TIẾN HÀNH MỞ MENU CHỌN SERVER... ===')
+      
+      bot.activateItem() 
+      bot.chat('/menu')
+      bot.chat('/server')
+
+      // Vòng lặp kiểm tra: Cứ mỗi 5 giây nếu thấy Menu chưa mở, bot sẽ tự gõ lại lệnh để kích hoạt
+      menuInterval = setInterval(() => {
+        if (!menuOpened && hasLoggedIn) {
+          console.log('⚠️ Phát hiện Menu chưa mở thành công, đang thử gõ lại lệnh kích hoạt...');
+          bot.activateItem()
+          bot.chat('/menu')
+          bot.chat('/server')
+        }
+      }, 5000)
+
     }, 10000)
 
-    // Chu kỳ Anti-AFK giả lập đi lại nhẹ nhàng chống kick
+    // Chu kỳ AFK chủ động giả lập đi lại
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -78,20 +96,26 @@ function startBot() {
     }, 25000) 
   })
 
+  // Xử lý khi Giao diện rương (Menu) được kích hoạt thành công
   bot.on('windowOpen', async (window) => {
-    console.log('=== MENU ĐÃ MỞ: CHỜ TẢI VẬT PHẨM... ===')
+    menuOpened = true
+    if (menuInterval) clearInterval(menuInterval)
     
-    // AN TOÀN: Tăng thời gian chờ lên hẳn 3.5 giây để Custom Head tải xong, tránh bị kẹt ô trống
+    console.log('=== THÀNH CÔNG: MENU ĐÃ MỞ! ĐANG CHỜ TẢI VẬT PHẨM... ===')
+    
+    // Chờ ổn định 3.5 giây để tránh lỗi click vào ô trống rỗng
     await new Promise(resolve => setTimeout(resolve, 3500))
 
     const TARGET_SLOT = 24 // Ô số 25 trong game (Tính từ số 0)
     
-    console.log(`-> Thực hiện click vào ô số 25 (Slot ID: ${TARGET_SLOT})`)
+    console.log(`-> Thực hiện click chuột trái vào ô số 25 (Slot ID: ${TARGET_SLOT})`)
+    
     bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
       if (err) {
         console.log('[LỖI CLICK]:', err.message)
+        bot.chat('/server kingsmp')
       } else {
-        console.log('=== THÀNH CÔNG: ĐÃ CLICK VÀO Ô 25 ĐỂ VÀO KINGSMP! ===')
+        console.log('=== HOÀN THÀNH: ĐÃ CLICK VÀO Ô 25 ĐỂ VÀO KINGSMP! ===')
       }
     })
   })
@@ -105,11 +129,13 @@ function startBot() {
   })
 
   bot.on('end', () => {
-    console.log('Mất kết nối. Đang tự động kết nối lại sau 40 giây để giải phóng Session...')
+    console.log('Mất kết nối. Đang tự động kết nối lại sau 40 giây...')
     hasLoggedIn = false 
+    menuOpened = false
     if (loginInterval) clearInterval(loginInterval)
+    if (menuInterval) clearInterval(menuInterval)
     if (afkInterval) clearInterval(afkInterval)
-    setTimeout(startBot, 40000) // Tăng thời gian kết nối lại lên 40 giây tránh bị tính là DDoS
+    setTimeout(startBot, 40000) 
   })
 }
 
