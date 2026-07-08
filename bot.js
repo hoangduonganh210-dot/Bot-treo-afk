@@ -44,7 +44,7 @@ function startBot() {
       bot.chat(`/dn ${PASSWORD}`)
       console.log(`[1/3] Đã gửi lệnh đăng nhập: /dn ******`)
       
-      // BƯỚC 2: Chờ 4 giây đăng nhập xong, click chuột phải luôn vì đồng hồ đã cầm sẵn trên tay
+      // BƯỚC 2: Chờ 4 giây đăng nhập xong, tự động click chuột phải bằng vật phẩm trên tay
       setTimeout(() => {
         console.log('[2/3] Thực hiện bấm chuột phải vào Đồng hồ trên tay để mở Menu...');
         bot.activateItem()
@@ -68,55 +68,24 @@ function startBot() {
 
   // BƯỚC 3: Xử lý khi Menu (GUI) được mở ra
   bot.on('windowOpen', async (window) => {
-    console.log('[3/3] Giao diện Menu đã mở. Đang tìm kiếm đầu người chơi KingSMP...')
+    console.log('[3/3] Giao diện Menu đã mở. Chuẩn bị click vào ô số 25...')
     
-    // Chờ 1.5 giây để đảm bảo toàn bộ dữ liệu Custom Head và Tên hiển thị được đồng bộ từ server
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    // Chờ 1 giây để Menu load ổn định hoàn toàn
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Tìm ô chứa player_head và kiểm tra xem tên hoặc thông tin có chứa chữ "King" không
-    const slotToClick = window.slots.find(item => {
-      if (!item) return false
-      
-      // Điều kiện 1: Vật phẩm phải là Đầu người chơi (player_head / skull)
-      const isPlayerHead = item.name.includes('player_head') || item.name.includes('skull')
-      
-      // Điều kiện 2: Kiểm tra tên hiển thị (Custom Name) chứa chữ "King"
-      let hasKingName = false
-      if (item.customName) {
-        hasKingName = item.customName.toLowerCase().includes('king')
-      }
-      
-      // Điều kiện dự phòng: Kiểm tra trong phần mô tả (Lore) nếu tên bị ẩn/mã hóa màu
-      let hasKingInLore = false
-      if (item.lore) {
-        const loreText = JSON.stringify(item.lore).toLowerCase()
-        hasKingInLore = loreText.includes('king')
-      }
+    // Ô số 25 trong đếm thông thường tương ứng với Slot ID = 24 trong lập trình (đếm từ 0)
+    const TARGET_SLOT = 24 
 
-      return isPlayerHead && (hasKingName || hasKingInLore)
-    })
-
-    if (slotToClick) {
-      console.log(`-> Tìm thấy Đầu KingSMP tại ô số: ${slotToClick.slot}. Tiến hành Click!`)
-      
-      // Click chuột trái vào ô vật phẩm đó để vào cụm
-      bot.clickWindow(slotToClick.slot, 0, 0, (err) => {
-        if (err) console.log('Lỗi khi click vào Menu:', err.message)
-        else console.log('=== CHÚC MỪNG: BOT ĐÃ CLICK VÀO ĐẦU KINGSMP THÀNH CÔNG! ===')
-      })
-    } else {
-      console.log('Không tìm thấy Player Head của KingSMP bằng bộ lọc chữ. Thử click trực tiếp vào ô cố định...')
-      
-      // Dự phòng: Theo hình ảnh, ô đó nằm ở hàng số 3, cột số 5 -> Vị trí ô chính xác trong hàng đợi là ô số 22
-      // (Tính từ ô số 0 ở góc trên cùng bên trái)
-      const backupSlot = 22
-      if (window.slots[backupSlot]) {
-         console.log(`-> Đang thử click vào ô dự phòng cố định số ${backupSlot}...`)
-         bot.clickWindow(backupSlot, 0, 0)
+    console.log(`-> Tiến hành click chuột trái vào ô cố định ID: ${TARGET_SLOT} (Ô thứ 25)`)
+    
+    // Giả lập click chuột trái (button: 0, mode: 0) vào đúng ô được chỉ định
+    bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
+      if (err) {
+        console.log('Lỗi khi click vào ô 25:', err.message)
       } else {
-         bot.chat('/server kingsmp')
+        console.log('=== CHÚC MỪNG: BOT ĐÃ CLICK VÀO Ô SỐ 25 THÀNH CÔNG! ===')
       }
-    }
+    })
   })
 
   bot.on('kicked', (reason) => {
