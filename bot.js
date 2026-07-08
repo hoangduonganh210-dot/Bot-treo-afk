@@ -18,7 +18,7 @@ function startBot() {
   const bot = mineflayer.createBot({
     host: 'sgp.kingmc.vn', 
     port: 25565,
-    username: 'coolgau', 
+    username: 'HDATHY', 
     version: '1.20.4', 
     auth: 'offline',
     connectTimeout: 60000, 
