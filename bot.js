@@ -1,21 +1,23 @@
 const mineflayer = require('mineflayer')
 
+// !!! ĐIỀN MẬT KHẨU CỦA BẠN VÀO ĐÂY !!!
 const PASSWORD = 'TrinhHoangYen' 
 
 function startBot() {
-  console.log('=== ĐANG KẾT NỐI QUA CỔNG NƯỚC NGOÀI SGP (ĐÃ BẬT VPN)... ===')
+  console.log('=== ĐANG KẾT NỐI QUA CỔNG SERVER... ===')
   
   const bot = mineflayer.createBot({
-    host: 'sgp.kingmc.vn', // Sử dụng lại cổng Singapore khi đã có VPN
+    host: 'sgp.kingmc.vn',
     port: 25565,
     username: 'coolgau', 
     version: '1.20.4',
     auth: 'offline',
-    connectTimeout: 30000, // Tăng thời gian chờ lên 30 giây cho mạng VPN ổn định
+    connectTimeout: 30000,
     timeout: 30000
   })
 
   let afkInterval
+  let menuClickInterval // Vòng lặp bấm chuột phải cho đến khi mở được menu
   let hasLoggedIn = false
 
   bot.on('login', () => {
@@ -28,17 +30,36 @@ function startBot() {
 
     console.log('=== ĐÃ VÀO SẢNH, CHỜ 4 GIÂY ĐỂ ĐĂNG NHẬP... ===')
     
+    // BƯỚC 1: Tự động gõ lệnh /dn
     setTimeout(() => {
-      bot.chat(`/dn ${PASSWORD}`)
-      console.log(`[1/3] Đã gửi lệnh: /dn ******`)
+      bot.chat(`/dn ${TrinhHoangYen}`)
+      console.log(`[1/3] Đã gửi lệnh: /dn TrinhHoangYen`)
       
+      // BƯỚC 2: Chờ tiếp 4 giây sau khi đăng nhập rồi tiến hành bấm chuột phải liên tục
       setTimeout(() => {
-        console.log('[2/3] Đang click chuột phải mở Menu Sảnh...')
-        bot.activateItem() 
-      }, 3000)
+        console.log('[2/3] Bắt đầu chu kỳ quét hotbar và click chuột phải mở Menu...')
+        
+        if (menuClickInterval) clearInterval(menuClickInterval)
+        
+        menuClickInterval = setInterval(() => {
+          // Tìm vật phẩm bất kỳ trong 9 ô hotbar (từ ô số 36 đến 44) để cầm lên tay
+          for (let i = 36; i < 45; i++) {
+            const item = bot.inventory.slots[i]
+            if (item) {
+              bot.setQuickBarSlot(i - 36) // Cầm vật phẩm đó lên tay
+              break
+            }
+          }
+          
+          // Thực hiện hành động chuột phải
+          bot.activateItem() 
+        }, 3000) // Cứ mỗi 3 giây bấm chuột phải 1 lần cho chắc chắn
+
+      }, 4000)
 
     }, 4000)
 
+    // Khởi động vòng lặp AFK chống bị server kick (Nhảy + Xoay người)
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -51,8 +72,17 @@ function startBot() {
     }, 30000)
   })
 
+  // BƯỚC 3: Tự động tìm và click vào ô "KingSMP" dựa trên Tên hoặc Mô tả (Lore)
   bot.on('windowOpen', async (window) => {
     console.log('[3/3] Phát hiện Giao diện Menu đã mở!')
+    
+    // Hủy bỏ vòng lặp bấm chuột phải ngay khi menu đã mở thành công
+    if (menuClickInterval) {
+      clearInterval(menuClickInterval)
+      menuClickInterval = null
+    }
+    
+    // Đợi 500ms để menu tải đầy đủ dữ liệu từ server
     await new Promise(resolve => setTimeout(resolve, 500))
 
     const items = window.containerItems()
@@ -88,7 +118,7 @@ function startBot() {
         console.log('Lỗi khi tương tác Menu:', err.message)
       }
     } else {
-      console.log('Không tìm thấy ô KingSMP.')
+      console.log('Xảy ra lỗi: Không tìm thấy chữ "kingsmp" trong Menu.')
     }
   })
 
@@ -98,6 +128,7 @@ function startBot() {
     console.log('Đang kết nối lại sau 5 giây...')
     hasLoggedIn = false 
     if (afkInterval) clearInterval(afkInterval)
+    if (menuClickInterval) clearInterval(menuClickInterval)
     setTimeout(startBot, 5000)
   })
 }
