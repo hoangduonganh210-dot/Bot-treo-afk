@@ -1,18 +1,28 @@
 const mineflayer = require('mineflayer')
+const http = require('http')
 
-// !!! ĐIỀN MẬT KHẨU CỦA BẠN VÀO ĐÂY !!!
+// Mật khẩu chính xác của bạn
 const PASSWORD = 'TrinhHoangYen' 
+
+// BẮT BUỘC CHO RENDER: Tạo một server web ảo để Render không quét lỗi tắt bot
+const PORT = process.env.PORT || 3000
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' })
+  res.end('Bot AFK dang hoat dong binh thuong!')
+}).listen(PORT, () => {
+  console.log(`[Render] Web server mo tren cong ${PORT}`)
+})
 
 function startBot() {
   console.log('=== ĐANG KẾT NỐI QUA CỔNG SERVER... ===')
   
   const bot = mineflayer.createBot({
-    host: 'sgp.kingmc.vn', // Cổng SGP dành cho kết nối quốc tế từ GitHub
+    host: 'sgp.kingmc.vn', // Sử dụng cổng kết nối quốc tế tốt nhất cho Render
     port: 25565,
     username: 'coolgau', 
     version: '1.20.4',
     auth: 'offline',
-    connectTimeout: 45000, // Tăng lên 45 giây cho thoải mái thời gian handshake mạng
+    connectTimeout: 45000,
     timeout: 45000
   })
 
@@ -29,13 +39,12 @@ function startBot() {
 
     console.log('=== ĐÃ VÀO SẢNH, CHỜ 5 GIÂY ĐỂ ỔN ĐỊNH BẢN ĐỒ... ===')
     
-    // BƯỚC 1: Chờ hẳn 5 giây để map load xong hoàn toàn rồi mới gửi lệnh đăng nhập
+    // BƯỚC 1: Chờ sảnh ổn định 5 giây rồi tự động gõ /dn
     setTimeout(() => {
       bot.chat(`/dn ${PASSWORD}`)
       console.log(`[1/2] Đã gửi lệnh đăng nhập: /dn ******`)
       
-      // BƯỚC 2: Chờ tiếp 4 giây để hệ thống sảnh chuyển bạn vào trạng thái đăng nhập xong
-      // Sau đó gõ lệnh trực tiếp để chuyển thẳng sang cụm KingSMP mà không cần bấm chuột phải
+      // BƯỚC 2: Chờ tiếp 4 giây để đăng nhập hoàn tất, gõ lệnh chuyển thẳng cụm KingSMP
       setTimeout(() => {
         console.log('[2/2] Đang gửi lệnh di chuyển thẳng vào cụm KingSMP...')
         bot.chat('/server kingsmp')
@@ -44,7 +53,7 @@ function startBot() {
 
     }, 5000)
 
-    // Khởi động vòng lặp AFK chống bị server kick (Nhảy + Xoay người)
+    // Khởi động chu kỳ nhảy AFK chống kick mỗi 30 giây
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -58,8 +67,7 @@ function startBot() {
   })
 
   bot.on('kicked', (reason) => {
-    console.log('Bot bị kick hoặc từ chối kết nối. Chi tiết lỗi từ server:')
-    console.log(reason)
+    console.log('Bot bị kick khỏi server. Chi tiết:', reason)
   })
 
   bot.on('error', (err) => {
@@ -67,10 +75,11 @@ function startBot() {
   })
 
   bot.on('end', () => {
-    console.log('Mất kết nối với server. Đang tự động kết nối lại sau 10 giây...')
+    // Đã chỉnh lên 30 giây để server kịp xóa phiên đăng nhập cũ, sửa lỗi trùng lặp proxy
+    console.log('Mất kết nối với server. Đang tự động kết nối lại sau 30 giây để giải phóng Session...')
     hasLoggedIn = false 
     if (afkInterval) clearInterval(afkInterval)
-    setTimeout(startBot, 30000) // Tăng thời gian chờ kết nối lại lên 10 giây để tránh bị firewall quét spam IP
+    setTimeout(startBot, 30000) 
   })
 }
 
