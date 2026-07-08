@@ -70,7 +70,7 @@ function startBot() {
     console.log('Mất kết nối với server. Đang tự động kết nối lại sau 10 giây...')
     hasLoggedIn = false 
     if (afkInterval) clearInterval(afkInterval)
-    setTimeout(startBot, 10000) // Tăng thời gian chờ kết nối lại lên 10 giây để tránh bị firewall quét spam IP
+    setTimeout(startBot, 30000) // Tăng thời gian chờ kết nối lại lên 10 giây để tránh bị firewall quét spam IP
   })
 }
 
