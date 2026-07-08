@@ -1,0 +1,46 @@
+name: Minecraft AFK Bot
+
+# Cấu hình bot tự động chạy khi bạn nhấn Code hoặc chạy thủ công
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📂 Buoc 1: Lay code tu kho luu tru (Checkout)
+      uses: actions/checkout@v4
+
+    - name: 🟢 Buoc 2: Cai dat moi truong Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+
+    - name: 📦 Buoc 3: Cai dat cac thu vien can thiet
+      run: |
+        npm install mineflayer
+
+    - name: 🌐 Buoc 4: Cai dat va Bat VPN Cloudflare WARP đe doi IP sach
+      run: |
+        # Thêm kho lưu trữ của Cloudflare vào Ubuntu
+        curl -fsSL https://cloudflareclient.com | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://cloudflareclient.com buster main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+        
+        # Cập nhật và tiến hành cài đặt phần mềm WARP
+        sudo apt-get update
+        sudo apt-get install cloudflare-warp -y
+        
+        # Khởi tạo và thiết lập chế độ kết nối mạng cho WARP
+        warp-cli --accept-tos registration new
+        warp-cli --accept-tos mode proxy
+        warp-cli --accept-tos connect
+        
+        # Chờ 5 giây để tiến trình thiết lập IP hoàn tất ổn định
+        sleep 5
+        echo "=== DA KICH HOAT KET NOI VPN THANH CONG ==="
+
+    - name: 🚀 Buoc 5: Chay Bot Minecraft AFK
+      run: node index.js
