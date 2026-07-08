@@ -1,9 +1,10 @@
 const mineflayer = require('mineflayer')
 const http = require('http')
 
+// Mật khẩu chính xác của bạn
 const PASSWORD = 'TrinhHoangYen' 
 
-// Tạo web server ảo duy trì hoạt động trên Render
+// BẮT BUỘC CHO RENDER: Tạo một server web ảo để Render không quét lỗi tắt bot
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -13,47 +14,46 @@ http.createServer((req, res) => {
 })
 
 function startBot() {
-  console.log('=== TRẠNG THÁI: ĐANG KẾT NỐI TỚI SERVER... ===')
+  console.log('=== ĐANG KẾT NỐI QUA CỔNG SERVER... ===')
   
   const bot = mineflayer.createBot({
     host: 'sgp.kingmc.vn', 
     port: 25565,
-    username: 'HDATHY', 
-    version: '1.20.4', 
+    username: 'coolgau', 
+    version: '1.20.4',
     auth: 'offline',
-    connectTimeout: 60000, 
-    timeout: 60000 
+    connectTimeout: 45000,
+    timeout: 45000
   })
 
   let afkInterval
-  let loginInterval
   let hasLoggedIn = false
 
   bot.on('login', () => {
-    console.log('=== TRẠNG THÁI: KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
+    console.log('=== BOT ONLINE: KẾT NỐI MẠNG THÀNH CÔNG ===')
   })
 
   bot.on('spawn', () => {
     if (hasLoggedIn) return
     hasLoggedIn = true
 
-    console.log('=== ĐÃ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP... ===')
+    console.log('=== ĐÃ VÀO SẢNH, CHỜ 5 GIÂY ĐỂ ỔN ĐỊNH BẢN ĐỒ... ===')
     
-    // Gửi lệnh đăng nhập chống kẹt
-    bot.chat(`/dn ${PASSWORD}`)
-    loginInterval = setInterval(() => {
-      if(!hasLoggedIn) return;
-      bot.chat(`/dn ${PASSWORD}`)
-    }, 3000)
-
-    // Chờ 7 giây để sảnh chính ổn định, sau đó chuột phải mở Menu
+    // BƯỚC 1: Đăng nhập tài khoản
     setTimeout(() => {
-      if (loginInterval) clearInterval(loginInterval)
-      console.log('=== TIẾN HÀNH BẤM CHUỘT PHẢI MỞ MENU... ===')
-      bot.activateItem()
-    }, 7000)
+      bot.chat(`/dn ${PASSWORD}`)
+      console.log(`[1/3] Đã gửi lệnh đăng nhập: /dn ******`)
+      
+      // BƯỚC 2: Chờ 4 giây đăng nhập xong, tự động click chuột phải bằng vật phẩm trên tay
+      setTimeout(() => {
+        console.log('[2/3] Thực hiện bấm chuột phải vào Đồng hồ trên tay để mở Menu...');
+        bot.activateItem()
+        console.log('-> Đã click chuột phải mở Menu Server!')
+      }, 4000)
 
-    // Chu kỳ Anti-AFK chủ động đi lại
+    }, 5000)
+
+    // Khởi động chu kỳ nhảy AFK chống kick mỗi 30 giây
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -63,59 +63,42 @@ function startBot() {
       const yaw = Math.random() * Math.PI * 2
       const pitch = (Math.random() - 0.5) * Math.PI * 0.5
       bot.look(yaw, pitch)
-
-      bot.setControlState('forward', true)
-      setTimeout(() => {
-        bot.setControlState('forward', false)
-        bot.setControlState('back', true)
-        setTimeout(() => bot.setControlState('back', false), 600)
-      }, 600)
-    }, 20000) 
+    }, 30000)
   })
 
-  // NÂNG CẤP CHÍNH: Xử lý click ô số 25 an toàn chống kẹt
+  // BƯỚC 3: Xử lý khi Menu (GUI) được mở ra
   bot.on('windowOpen', async (window) => {
-    console.log('=== MENU ĐÃ MỞ: ĐANG ĐỒNG BỘ VẬT PHẨM... ===')
+    console.log('[3/3] Giao diện Menu đã mở. Chuẩn bị click vào ô số 25...')
     
-    // Tăng thời gian chờ lên 2.5 giây để server gửi đầy đủ dữ liệu Custom Head về bot
-    await new Promise(resolve => setTimeout(resolve, 2500))
+    // Chờ 1 giây để Menu load ổn định hoàn toàn
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Ô số 25 tính từ góc trái trên xuống tương đương Slot ID = 24 trong code
+    // Ô số 25 trong đếm thông thường tương ứng với Slot ID = 24 trong lập trình (đếm từ 0)
     const TARGET_SLOT = 24 
-    
-    // Kiểm tra xem ô đó có vật phẩm thực tế chưa
-    const itemInSlot = window.slots[TARGET_SLOT]
 
-    if (itemInSlot) {
-      console.log(`-> Đã phát hiện vật phẩm [${itemInSlot.name}] tại ô số 25. Tiến hành Click ngay!`)
-      
-      // Giả lập click chuột trái (button: 0, mode: 0)
-      bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
-        if (err) {
-          console.log('[LỖI CLICK]:', err.message)
-        } else {
-          console.log('=== THÀNH CÔNG: ĐÃ CLICK VÀO Ô 25 ĐỂ VÀO KINGSMP! ===')
-        }
-      })
-    } else {
-      console.log('⚠️ CẢNH BÁO: Ô số 25 đang trống rỗng (chưa kịp load vật phẩm). Ép lệnh click cưỡng bức...')
-      // Nếu trống, bot vẫn bấm đại vào ô đó phòng trường hợp ẩn item hiển thị
-      bot.clickWindow(TARGET_SLOT, 0, 0)
-    }
+    console.log(`-> Tiến hành click chuột trái vào ô cố định ID: ${TARGET_SLOT} (Ô thứ 25)`)
+    
+    // Giả lập click chuột trái (button: 0, mode: 0) vào đúng ô được chỉ định
+    bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
+      if (err) {
+        console.log('Lỗi khi click vào ô 25:', err.message)
+      } else {
+        console.log('=== CHÚC MỪNG: BOT ĐÃ CLICK VÀO Ô SỐ 25 THÀNH CÔNG! ===')
+      }
+    })
   })
 
   bot.on('kicked', (reason) => {
-    console.log('Bot bị kick khỏi server. Lý do:', JSON.stringify(reason))
+    console.log('Bot bị kick khỏi server. Chi tiết:', reason)
   })
 
   bot.on('error', (err) => {
-    console.log('Lỗi mạng phát sinh:', err.message)
+    console.log('Lỗi hệ thống mạng:', err.message)
   })
 
   bot.on('end', () => {
-    console.log('Mất kết nối. Đang tự động kết nối lại sau 30 giây...')
+    console.log('Mất kết nối với server. Đang tự động kết nối lại sau 30 giây để giải phóng Session...')
     hasLoggedIn = false 
-    if (loginInterval) clearInterval(loginInterval)
     if (afkInterval) clearInterval(afkInterval)
     setTimeout(startBot, 30000) 
   })
