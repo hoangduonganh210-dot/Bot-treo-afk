@@ -1,7 +1,7 @@
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-const PASSWORD = 'bill1906' 
+const PASSWORD = 'TrinhHoangYen' 
 
 // Tạo web server ảo cho Render duy trì hoạt động
 const PORT = process.env.PORT || 3000
@@ -18,7 +18,7 @@ function startBot() {
   const bot = mineflayer.createBot({
     host: 'sgp.kingmc.vn', 
     port: 25565,
-    username: 'Zwetvn1808', // ĐÃ ĐỔI THÀNH TÊN COOLGAU THEO YÊU CẦU
+    username: 'coolgau', // ĐÃ ĐỔI THÀNH TÊN COOLGAU THEO YÊU CẦU
     version: '1.20.4', 
     auth: 'offline',
     connectTimeout: 60000, 
