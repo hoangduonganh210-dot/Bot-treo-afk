@@ -3,13 +3,13 @@ const http = require('http')
 
 const PASSWORD = 'TrinhHoangYen' 
 
-// Web Server ảo cho Render
+// 1. Web Server ảo để Render nhận diện bot chạy 24/7
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
   res.end('Bot AFK KingMC dang chay!')
 }).listen(PORT, () => {
-  console.log(`[Render] Web server listening on port ${PORT}`)
+  console.log(`[Render] Web server opened on port ${PORT}`)
 })
 
 function startBot() {
@@ -30,43 +30,31 @@ function startBot() {
   let inGame = false
 
   bot.on('login', () => {
-    console.log('=== KẾT NỐI MẠNG THÀNH CÔNG ===')
+    console.log('=== KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
   })
 
   bot.on('spawn', () => {
     if (inGame) return
 
-    console.log('=== VÀO SẢNH: THỰC HIỆN ĐĂNG NHẬP & CHUYỂN SERVER ===')
+    console.log('=== VÀO SẢNH: ĐĂNG NHẬP VÀ MỞ MENU (/menu)... ===')
 
-    // 1. Thao tác đăng nhập
+    // 1. Gửi lệnh đăng nhập ban đầu
     setTimeout(() => {
       bot.chat(`/dn ${PASSWORD}`)
       console.log('-> Gửi lệnh /dn...')
     }, 2000)
 
-    // 2. Vòng lặp liên tục thử vào game mỗi 5 giây cho đến khi thành công
+    // 2. Định kỳ gửi /dn và /menu mỗi 5 giây nếu chưa vào được game
     if (actionInterval) clearInterval(actionInterval)
     actionInterval = setInterval(() => {
       if (inGame) return
 
-      console.log('-> Đang thử gõ /dn và mở Menu/Chuyển server...')
+      console.log('-> Đang thử lại: Gửi /dn và mở /menu...')
       bot.chat(`/dn ${PASSWORD}`)
-
-      // Chuyển sang cầm ô Đồng Hồ trên hotbar (Thường là slot 4 hoặc 2/3)
-      try {
-        bot.setQuickBarSlot(4) // Ô số 5 trên thanh hotbar
-      } catch (e) {}
-
-      // Chuột phải dùng Đồng Hồ
-      bot.activateItem()
-
-      // Lệnh dự phòng chat thẳng
-      bot.chat('/menu')
-      bot.chat('/kingsmp')
-      bot.chat('/server kingsmp')
+      bot.chat('/menu') // Lệnh mở Menu
     }, 5000)
 
-    // Anti-AFK
+    // 3. Cơ chế Anti-AFK cơ bản
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -75,35 +63,43 @@ function startBot() {
     }, 20000)
   })
 
-  // Khi Menu Chest mở ra -> Tự động Click ô KingSMP (Slot 23)
-  bot.on('windowOpen', async (window) => {
-    console.log('=== MENU ĐÃ MỞ! ĐANG CLICK Ô KINGSMP (SLOT 23)... ===')
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  // 4. LẮNG NGHE SỰ KIỆN MỞ MENU -> CLICK CHUỘT TRÁI VÀO SLOT 24
+  bot.on('windowOpen', (window) => {
+    if (inGame) return
 
-    const TARGET_SLOT = 23 // Hàng 3, Cột 6
-    
-    bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
-      if (!err) {
-        console.log('=== ĐÃ CLICK THÀNH CÔNG Ô 23! ===')
-      } else {
-        console.log('[LỖI CLICK]:', err.message)
-      }
-    })
+    console.log(`[BOT] Đã mở giao diện: ${window.title || 'Menu/Chest'}`)
+
+    const slotToClick = 24  // Ô số 24 bạn cần click
+    const mouseButton = 0  // 0: Chuột trái
+    const clickMode = 0    // 0: Click đơn thông thường
+
+    // Trễ 0.5 giây cho an toàn và tránh bị chống hack/spam block
+    setTimeout(() => {
+      bot.clickWindow(slotToClick, mouseButton, clickMode, (err) => {
+        if (err) {
+          console.error(`[LỖI] Không thể click vào ô số 24:`, err.message)
+        } else {
+          console.log(`=== [BOT] ĐÃ CLICK CHUỘT TRÁI VÀO Ô SỐ 24 THÀNH CÔNG! ===`)
+          inGame = true
+          if (actionInterval) clearInterval(actionInterval)
+        }
+      })
+    }, 500)
   })
 
-  // Khi nhận thấy đã đổi thế giới / chuyển server
+  // 5. Xử lý chuyển server / ngắt kết nối
   bot.on('respawn', () => {
-    console.log('=== BOT ĐÃ CHUYỂN SẢNH / RESPAWN THÀNH CÔNG! ===')
+    console.log('=== BOT ĐÃ CHUYỂN SERVER / RESPAWN THÀNH CÔNG! ===')
     inGame = true
     if (actionInterval) clearInterval(actionInterval)
   })
 
   bot.on('kicked', (reason) => {
-    console.log('Bot bị kick:', JSON.stringify(reason))
+    console.log('Bot bị kick khỏi server:', JSON.stringify(reason))
   })
 
   bot.on('error', (err) => {
-    console.log('Lỗi:', err.message)
+    console.log('Lỗi phát sinh:', err.message)
   })
 
   bot.on('end', () => {
