@@ -3,17 +3,17 @@ const http = require('http')
 
 const PASSWORD = 'TrinhHoangYen' 
 
-// 1. Tạo Web Server ảo để Render nhận diện dịch vụ đang chạy 24/7
+// Web Server ảo cho Render
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Bot AFK KingMC đang hoạt động bình thường!')
+  res.end('Bot AFK KingMC dang chay!')
 }).listen(PORT, () => {
-  console.log(`[Render] Web server đã mở trên port ${PORT}`)
+  console.log(`[Render] Web server listening on port ${PORT}`)
 })
 
 function startBot() {
-  console.log('=== TRẠNG THÁI: ĐANG KẾT NỐI TỚI KINGMC VỚI TÊN COOLGAU... ===')
+  console.log('=== TRẠNG THÁI: KẾT NỐI TỚI KINGMC (COOLGAU)... ===')
   
   const bot = mineflayer.createBot({
     host: 'sgp.kingmc.vn', 
@@ -26,135 +26,92 @@ function startBot() {
   })
 
   let afkInterval
-  let loginInterval
-  let menuInterval
-  let inGame = false // Đánh dấu bot đã vào hẳn cụm game chính chưa
+  let actionInterval
+  let inGame = false
 
   bot.on('login', () => {
-    console.log('=== TRẠNG THÁI: KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
+    console.log('=== KẾT NỐI MẠNG THÀNH CÔNG ===')
   })
 
   bot.on('spawn', () => {
-    // Nếu đã vào cụm game KingSMP rồi thì không lặp lại logic ở Sảnh
     if (inGame) return
 
-    console.log('=== ĐÃ VÀO SẢNH CHỜ: BẮT ĐẦU ĐĂNG NHẬP... ===')
-    
-    // Đăng nhập lần 1 sau 2.5s
+    console.log('=== VÀO SẢNH: THỰC HIỆN ĐĂNG NHẬP & CHUYỂN SERVER ===')
+
+    // 1. Thao tác đăng nhập
     setTimeout(() => {
       bot.chat(`/dn ${PASSWORD}`)
-      console.log('-> Đã gửi lệnh đăng nhập lần 1.')
-    }, 2500)
+      console.log('-> Gửi lệnh /dn...')
+    }, 2000)
 
-    // Lặp lại gõ /dn mỗi 4 giây cho đến khi vào được game (Chống lag/nuốt lệnh)
-    if (loginInterval) clearInterval(loginInterval)
-    loginInterval = setInterval(() => {
-      if (!inGame) {
-        console.log('-> Đang thử lại lệnh đăng nhập /dn...')
-        bot.chat(`/dn ${PASSWORD}`)
-      }
-    }, 4000)
+    // 2. Vòng lặp liên tục thử vào game mỗi 5 giây cho đến khi thành công
+    if (actionInterval) clearInterval(actionInterval)
+    actionInterval = setInterval(() => {
+      if (inGame) return
 
-    // Chờ 7s để sảnh load ổn định -> Kích hoạt Đồng Hồ (Chuột phải) & Mở Menu
-    setTimeout(() => {
-      console.log('=== SẢNH ỔN ĐỊNH: BẮT ĐẦU KÍCH HOẠT ĐỒNG HỒ & MỞ MENU... ===')
-      
-      bot.activateItem()   // Chuột phải vào Đồng Hồ đang cầm trên tay
-      bot.chat('/menu')    // Lệnh dự phòng mở Menu
-      bot.chat('/kingsmp') // Lệnh dự phòng vào thẳng server
+      console.log('-> Đang thử gõ /dn và mở Menu/Chuyển server...')
+      bot.chat(`/dn ${PASSWORD}`)
 
-      // Nếu sau 5s vẫn ở sảnh thì kích hoạt lại Đồng Hồ
-      if (menuInterval) clearInterval(menuInterval)
-      menuInterval = setInterval(() => {
-        if (!inGame) {
-          console.log('⚠️ Chưa chuyển server, đang kích hoạt lại Đồng hồ và Menu...');
-          bot.activateItem()
-          bot.chat('/menu')
-          bot.chat('/kingsmp')
-        }
-      }, 5000)
+      // Chuyển sang cầm ô Đồng Hồ trên hotbar (Thường là slot 4 hoặc 2/3)
+      try {
+        bot.setQuickBarSlot(4) // Ô số 5 trên thanh hotbar
+      } catch (e) {}
 
-    }, 7000)
+      // Chuột phải dùng Đồng Hồ
+      bot.activateItem()
 
-    // Vòng lặp Anti-AFK (Tự nhảy, đi lại, xoay góc nhìn)
+      // Lệnh dự phòng chat thẳng
+      bot.chat('/menu')
+      bot.chat('/kingsmp')
+      bot.chat('/server kingsmp')
+    }, 5000)
+
+    // Anti-AFK
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
-      
-      // Nhảy
       bot.setControlState('jump', true)
-      setTimeout(() => bot.setControlState('jump', false), 400)
-      
-      // Đi tiến & xoay camera
-      bot.setControlState('forward', true)
-      setTimeout(() => {
-        bot.setControlState('forward', false)
-        const yaw = bot.entity.yaw + (Math.PI / 2) * (Math.random() > 0.5 ? 1 : -1)
-        bot.look(yaw, 0, true)
-        
-        // Đi sang ngang
-        bot.setControlState('right', true)
-        setTimeout(() => {
-          bot.setControlState('right', false)
-        }, 700)
-      }, 800)
-
-    }, 25000) // Thực hiện mỗi 25 giây
+      setTimeout(() => bot.setControlState('jump', false), 300)
+    }, 20000)
   })
 
-  // Xử lý khi Menu Chest mở ra
+  // Khi Menu Chest mở ra -> Tự động Click ô KingSMP (Slot 23)
   bot.on('windowOpen', async (window) => {
-    if (inGame) return
-    console.log('=== MENU ĐÃ MỞ! CHỜ 1.5 GIÂY ĐỂ ĐỒNG BỘ ITEM... ===')
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    console.log('=== MENU ĐÃ MỞ! ĐANG CLICK Ô KINGSMP (SLOT 23)... ===')
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Ô KingSMP nằm ở Hàng 3, Cột 6 -> Slot ID chính xác là 23
-    const TARGET_SLOT = 23 
-    
-    console.log(`-> Tiến hành click vào ô KingSMP (Slot ID: ${TARGET_SLOT})`)
+    const TARGET_SLOT = 23 // Hàng 3, Cột 6
     
     bot.clickWindow(TARGET_SLOT, 0, 0, (err) => {
-      if (err) {
-        console.log('[LỖI CLICK MENU]:', err.message)
-        bot.chat('/kingsmp')
+      if (!err) {
+        console.log('=== ĐÃ CLICK THÀNH CÔNG Ô 23! ===')
       } else {
-        console.log('=== THÀNH CÔNG: ĐÃ CLICK VÀO KINGSMP! ===')
+        console.log('[LỖI CLICK]:', err.message)
       }
     })
   })
 
-  // Lắng nghe chat để nhận diện khi đã vào server chính thành công
-  bot.on('messagestr', (message) => {
-    if (
-      message.includes('Đăng nhập thành công') || 
-      message.includes('Chuyển máy chủ') || 
-      message.includes('KingSMP') ||
-      message.includes('Chào mừng')
-    ) {
-      if (!inGame) {
-        console.log('=== XÁC NHẬN: BOT ĐÃ VÀO GAME THÀNH CÔNG! DỪNG CÁC VÒNG LẶP SẢNH. ===')
-        inGame = true
-        if (loginInterval) clearInterval(loginInterval)
-        if (menuInterval) clearInterval(menuInterval)
-      }
-    }
+  // Khi nhận thấy đã đổi thế giới / chuyển server
+  bot.on('respawn', () => {
+    console.log('=== BOT ĐÃ CHUYỂN SẢNH / RESPAWN THÀNH CÔNG! ===')
+    inGame = true
+    if (actionInterval) clearInterval(actionInterval)
   })
 
   bot.on('kicked', (reason) => {
-    console.log('Bot bị kick khỏi server. Lý do:', JSON.stringify(reason))
+    console.log('Bot bị kick:', JSON.stringify(reason))
   })
 
   bot.on('error', (err) => {
-    console.log('Lỗi mạng phát sinh:', err.message)
+    console.log('Lỗi:', err.message)
   })
 
   bot.on('end', () => {
-    console.log('Mất kết nối! Đang tự động kết nối lại sau 30 giây...')
+    console.log('Mất kết nối! Đang tự động kết nối lại sau 20 giây...')
     inGame = false
-    if (loginInterval) clearInterval(loginInterval)
-    if (menuInterval) clearInterval(menuInterval)
+    if (actionInterval) clearInterval(actionInterval)
     if (afkInterval) clearInterval(afkInterval)
-    setTimeout(startBot, 30000)
+    setTimeout(startBot, 20000)
   })
 }
 
