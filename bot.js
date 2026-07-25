@@ -61,7 +61,6 @@ function startBot() {
       
       bot.activateItem() 
       bot.chat('/menu')
-      bot.chat('/server')
 
       // Kiểm tra định kỳ mỗi 6 giây nếu Menu lỗi chưa mở thì gửi lại lệnh
       menuInterval = setInterval(() => {
