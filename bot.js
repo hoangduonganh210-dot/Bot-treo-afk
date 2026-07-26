@@ -1,61 +1,76 @@
 const mineflayer = require('mineflayer')
 const http = require('http')
 
-const PASSWORD = 'TrinhHoangYen' 
+// ==================== CẤU HÌNH BOT ====================
+const PASSWORD = 'TrinhHoangYen'
+const HOST = 'sgp.kingmc.vn'
+const PORT_MC = 25565
+const USERNAME = 'coolgau'
+const VERSION = '1.20.4'
 
-// Web Server ảo duy trì Render 24/7
+// Web Server phụ duy trì 24/7 trên Render
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('Bot AFK KingMC dang chay!')
+  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
+  res.end('Bot AFK KingMC đang chạy!')
 }).listen(PORT, () => {
-  console.log(`[Render] Web server opened on port ${PORT}`)
+  console.log(`[Render] Web Server running on port ${PORT}`)
 })
 
 function startBot() {
-  console.log('=== TRẠNG THÁI: KẾT NỐI TỚI KINGMC (COOLGAU)... ===')
+  // ===================================================
+  // BƯỚC 1: TẠO BOT
+  // ===================================================
+  console.log('=== BƯỚC 1: ĐANG TẠO VÀ KHỞI TẠO BOT ===')
   
   const bot = mineflayer.createBot({
-    host: 'sgp.kingmc.vn', 
-    port: 25565,
-    username: 'coolgau',
-    version: '1.20.4', 
+    host: HOST,
+    port: PORT_MC,
+    username: USERNAME,
+    version: VERSION,
     auth: 'offline',
-    connectTimeout: 60000, 
-    timeout: 60000 
+    connectTimeout: 60000,
+    timeout: 60000
   })
 
-  let afkInterval
-  let actionInterval
+  let actionInterval = null
+  let afkInterval = null
   let inGame = false
-  let isMenuOpen = false // Cờ kiểm tra trạng thái Menu đang mở
+  let isMenuOpen = false
 
+  // ===================================================
+  // BƯỚC 2: JOIN SERVER
+  // ===================================================
   bot.on('login', () => {
-    console.log('=== KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
+    console.log('=== BƯỚC 2: BOT ĐÃ JOIN SERVER THÀNH CÔNG (ONLINE) ===')
   })
 
   bot.on('spawn', () => {
     if (inGame) return
 
-    console.log('=== VÀO SẢNH CHỜ: ĐĂNG NHẬP VÀ MỞ MENU ===')
+    console.log('-> Đã vào sảnh chờ, chuẩn bị đăng nhập...')
 
-    // Gửi lệnh đăng nhập lần đầu
+    // Tự động đăng nhập /dn sau khi vào server
     setTimeout(() => {
-      bot.chat(`/dn ${PASSWORD}`)
-      console.log('-> Đã gửi lệnh /dn ban đầu.')
+      if (!inGame) {
+        bot.chat(`/dn ${PASSWORD}`)
+        console.log(`-> Đã gửi lệnh: /dn ${PASSWORD}`)
+      }
     }, 2000)
 
-    // Nếu chưa vào game VÀ Menu chưa mở thì mới định kỳ gửi lệnh
+    // ===================================================
+    // BƯỚC 3: DÙNG LỆNH /menu
+    // ===================================================
     if (actionInterval) clearInterval(actionInterval)
     actionInterval = setInterval(() => {
       if (!inGame && !isMenuOpen) {
-        console.log('-> Đang gửi /dn và thử mở /menu...')
+        console.log('=== BƯỚC 3: DÙNG LỆNH /menu ===')
         bot.chat(`/dn ${PASSWORD}`)
         bot.chat('/menu')
       }
     }, 4000)
 
-    // Anti-AFK
+    // Anti-AFK nhảy nhẹ mỗi 20 giây
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -64,48 +79,44 @@ function startBot() {
     }, 20000)
   })
 
-  // LẮNG NGHE SỰ KIỆN MỞ MENU
+  // ===================================================
+  // BƯỚC 4: CHỌN VÀO Ô THỨ 24 (ĐẾM TỪ 0)
+  // ===================================================
   bot.on('windowOpen', async (window) => {
     if (inGame) return
 
-    isMenuOpen = true // Đánh dấu Menu đã mở -> Tạm dừng spam /menu
-    console.log(`=== MENU ĐÃ MỞ! ĐANG CHỜ 1 GIÂY ĐỂ CLICK SLOT 24... ===`)
+    isMenuOpen = true
+    console.log(`-> Menu đã mở: "${window.title}". Chờ 1.2s để giao diện load...`)
 
-    // Chờ 1 giây ổn định giao diện
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // Chờ 1.2s để item trong Menu load xong hoàn toàn
+    await new Promise(resolve => setTimeout(resolve, 1200))
 
-    const slotToClick = 24  // Ô số 24 
-    const mouseButton = 0  // Chuột trái
-    const clickMode = 0    // Click đơn
+    try {
+      const slotToClick = 24 // Ô thứ 24 (đếm từ 0)
+      console.log(`=== BƯỚC 4: CHỌN VÀO Ô THỨ ${slotToClick} (SLOT 24) ===`)
+      
+      // Click chuột trái (button 0, mode 0) vào ô thứ 24
+      await bot.clickWindow(slotToClick, 0, 0)
+      console.log(`=== [THÀNH CÔNG] ĐÃ CLICK VÀO Ô THỨ ${slotToClick}! ===`)
 
-    console.log(`-> Tiến hành click chuột trái vào Slot ${slotToClick}...`)
-    
-    bot.clickWindow(slotToClick, mouseButton, clickMode, (err) => {
-      if (err) {
-        console.error(`[LỖI CLICK]:`, err.message)
-        isMenuOpen = false // Nếu click lỗi thì cho phép mở lại menu
-      } else {
-        console.log(`=== [THÀNH CÔNG] ĐÃ CLICK SLOT 24 THÀNH CÔNG! ===`)
-        inGame = true
-        if (actionInterval) clearInterval(actionInterval)
-      }
-    })
+      inGame = true
+      isMenuOpen = false
+      if (actionInterval) clearInterval(actionInterval)
+    } catch (err) {
+      console.error('[LỖI CLICK Ô 24]:', err.message || err)
+      isMenuOpen = false // Reset để thử lại nếu lỗi
+    }
   })
 
+  // Xử lý khi chuyển Server thành công
   bot.on('respawn', () => {
-    console.log('=== BOT ĐÃ RESPAWN / CHUYỂN SERVER THÀNH CÔNG! ===')
+    console.log('-> Bot đã Respawn / Chuyển Server thành công!')
     inGame = true
+    isMenuOpen = false
     if (actionInterval) clearInterval(actionInterval)
   })
 
-  bot.on('kicked', (reason) => {
-    console.log('Bot bị kick khỏi server:', JSON.stringify(reason))
-  })
-
-  bot.on('error', (err) => {
-    console.log('Lỗi phát sinh:', err.message)
-  })
-
+  // Tự động kết nối lại khi bị ngắt kết nối
   bot.on('end', () => {
     console.log('Mất kết nối! Tự động kết nối lại sau 20 giây...')
     inGame = false
@@ -114,6 +125,10 @@ function startBot() {
     if (afkInterval) clearInterval(afkInterval)
     setTimeout(startBot, 20000)
   })
+
+  bot.on('error', (err) => console.log('Lỗi:', err.message))
+  bot.on('kicked', (reason) => console.log('Bị kick:', JSON.stringify(reason)))
 }
 
+// Chạy ứng dụng
 startBot()
