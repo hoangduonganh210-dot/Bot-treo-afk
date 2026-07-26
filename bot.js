@@ -43,6 +43,7 @@ function startBot() {
 
   let inGame = false
   let isLoggedIn = false
+  let clockInterval = null
 
   bot.on('login', () => {
     console.log(`=== [BƯỚC 2] ${CONFIG.USERNAME} ĐÃ KẾT NỐI VÀO LOBBY ===`)
@@ -53,13 +54,13 @@ function startBot() {
 
     console.log('-> Đã spawn tại sảnh. Tiến hành đăng nhập...')
 
-    // Tự động đăng nhập sau 2.5s spawn
+    // Đăng nhập sau 3s spawn
     setTimeout(() => {
       if (!inGame && !isLoggedIn) {
         console.log('=== [BƯỚC 3] GỬI LỆNH ĐĂNG NHẬP ===')
         bot.chat(`/dn ${CONFIG.PASSWORD}`)
       }
-    }, 2500)
+    }, 3000)
   })
 
   // Lắng nghe chat để xác nhận Đăng nhập
@@ -69,44 +70,64 @@ function startBot() {
     if (message.includes('Đăng nhập thành công') || message.includes('Bạn đã đăng nhập') || message.includes('thành công')) {
       if (isLoggedIn || inGame) return
       isLoggedIn = true
-      console.log('=== ĐÃ ĐĂNG NHẬP THÀNH CÔNG! BẮT ĐẦU MỞ MENU... ===')
+      console.log('=== ĐÃ ĐĂNG NHẬP THÀNH CÔNG! CHỜ 3S ĐỂ MỞ MENU... ===')
 
-      setTimeout(openMenuWithClock, 1500)
+      // Đợi hẳn 3.5 giây cho server ổn định tránh anti-bot kick
+      setTimeout(startUsingClock, 3500)
     }
   })
 
-  // Hàm cầm Đồng hồ mở Menu
-  function openMenuWithClock() {
-    if (inGame) return
+  // Bắt đầu dùng Đồng hồ (có cơ chế thử lại nhẹ nhàng)
+  function startUsingClock() {
+    if (inGame || bot.currentWindow) return
 
-    console.log('-> Cầm Đồng hồ (Slot 2) và nhấn chuột phải...')
-    try {
-      bot.setQuickBarSlot(2)
-      
-      setTimeout(() => {
-        bot.activateItem()
-      }, 500)
-    } catch (err) {
-      console.log('Lỗi cầm item:', err.message)
-    }
+    if (clockInterval) clearInterval(clockInterval)
+
+    clockInterval = setInterval(() => {
+      if (inGame || bot.currentWindow) {
+        clearInterval(clockInterval)
+        return
+      }
+
+      console.log('-> Cầm Đồng hồ (Slot 2) và nhấn chuột phải...')
+      try {
+        // Nhảy nhẹ 1 cái để bypass anti-bot
+        bot.setControlState('jump', true)
+        setTimeout(() => bot.setControlState('jump', false), 200)
+
+        // Chọn Slot 2
+        bot.setQuickBarSlot(2)
+
+        // Dùng item sau khi đã chuyển slot 0.8s
+        setTimeout(() => {
+          if (!inGame && !bot.currentWindow) {
+            bot.activateItem()
+          }
+        }, 800)
+
+      } catch (err) {
+        console.log('Lỗi thao tác item:', err.message)
+      }
+    }, 4000) // Thử lại mỗi 4 giây nếu Menu chưa mở
   }
 
-  // BƯỚC 4: LẮNG NGHE KHI ITEM TRONG MENU LOAD XONG RỒI MỚI CLICK
+  // BƯỚC 4: BẮT SỰ KIỆN MENU MỞ VÀ CLICK SLOT 24
   bot.on('windowOpen', (window) => {
     if (inGame) return
 
+    if (clockInterval) clearInterval(clockInterval) // Mở được Menu thì dừng bấm Đồng hồ ngay
+
     console.log(`=== [BƯỚC 4] MENU ĐÃ MỞ: "${window.title || 'GUI'}" ===`)
 
-    // Hàm thực hiện click khi item ở slot 24 sẵn sàng
+    // Hàm kiểm tra và click Slot 24
     const tryClickTargetSlot = async () => {
       if (inGame || !bot.currentWindow) return
 
       const targetItem = window.slots[CONFIG.SLOT_TO_CLICK]
       
-      // Nếu Slot 24 đã có item (Không phải ô trống)
       if (targetItem && targetItem.type !== null) {
         const itemName = targetItem.displayName || targetItem.name
-        console.log(`=== [ITEM ĐÃ LOAD] Slot ${CONFIG.SLOT_TO_CLICK}: [${itemName}] -> THỰC HIỆN CLICK! ===`)
+        console.log(`=== [ITEM ĐÃ LOAD] Slot ${CONFIG.SLOT_TO_CLICK}: [${itemName}] -> CLICK! ===`)
 
         try {
           await bot.clickWindow(CONFIG.SLOT_TO_CLICK, 0, 0)
@@ -115,17 +136,17 @@ function startBot() {
           console.error('[LỖI CLICK]:', err.message)
         }
       } else {
-        console.log(`-> Slot ${CONFIG.SLOT_TO_CLICK} vẫn đang trống, tiếp tục chờ Server gửi item...`)
+        console.log(`-> Slot ${CONFIG.SLOT_TO_CLICK} chưa load item, đang đợi...`)
       }
     }
 
-    // 1. Thử kiểm tra và click ngay sau khi mở 1 giây
-    setTimeout(tryClickTargetSlot, 1000)
+    // Thử click sau 1.5s
+    setTimeout(tryClickTargetSlot, 1500)
 
-    // 2. Nếu server load item chậm, bắt sự kiện updateSlot khi item vừa được gửi đến Slot 24
+    // Bắt sự kiện khi item load vào Slot 24
     window.on('updateSlot', (slot, oldItem, newItem) => {
       if (slot === CONFIG.SLOT_TO_CLICK && newItem) {
-        console.log('-> Phát hiện Slot 24 vừa được cập nhật item từ Server!')
+        console.log('-> Slot 24 vừa được server gửi item tới!')
         tryClickTargetSlot()
       }
     })
@@ -135,12 +156,14 @@ function startBot() {
   bot.on('respawn', () => {
     console.log('=== HOÀN TẤT: BOT ĐÃ CHUYỂN SERVER VÀO GAME! ===')
     inGame = true
+    if (clockInterval) clearInterval(clockInterval)
   })
 
   bot.on('end', () => {
     console.log(`Mất kết nối! Sẽ kết nối lại sau ${CONFIG.RECONNECT_DELAY / 1000}s...`)
     inGame = false
     isLoggedIn = false
+    if (clockInterval) clearInterval(clockInterval)
     setTimeout(startBot, CONFIG.RECONNECT_DELAY)
   })
 
