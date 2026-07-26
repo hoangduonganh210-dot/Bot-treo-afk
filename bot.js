@@ -15,9 +15,9 @@ const CONFIG = {
   // Thời gian cấu hình (tính bằng mili-giây)
   DELAY_AFTER_SPAWN: 2000,      // Chờ 2s sau khi spawn mới bắt đầu
   INTERVAL_RETRY_USE_CLOCK: 4000,// Thử kích hoạt Đồng hồ mỗi 4 giây
-  DELAY_AFTER_MENU_OPEN: 1500,  // Chờ 1.5s cho GUI đồng bộ item rồi mới click
+  DELAY_AFTER_MENU_OPEN: 2000,  // Chờ 2s cho Menu tải xong hoàn toàn item
   RECONNECT_DELAY: 15000,       // Thời gian kết nối lại khi mất mạng
-  WEB_PORT: process.env.PORT || 3000 // Port Web Server cho Render 24/7
+  WEB_PORT: process.env.PORT || 3000
 }
 
 // ===================================================
@@ -66,15 +66,13 @@ function startBot() {
         if (!inGame && !isMenuOpen) {
           console.log('=== [BƯỚC 3] ĐĂNG NHẬP VÀ KÍCH HOẠT ĐỒNG HỒ ===')
           
-          // 1. Gửi lệnh đăng nhập
           bot.chat(`/dn ${CONFIG.PASSWORD}`)
 
-          // 2. Chuyển sang ô ĐỒNG HỒ (Slot index 2 trên Hotbar) và Bấm chuột phải
           setTimeout(() => {
             if (!inGame && !isMenuOpen) {
               try {
-                bot.setQuickBarSlot(2) // Ô thứ 3 từ trái sang (Index 2)
-                bot.activateItem()     // Chuột phải dùng Đồng hồ
+                bot.setQuickBarSlot(2) // Ô ĐỒNG HỒ (Slot 2)
+                bot.activateItem()
                 console.log('-> Đã chọn Slot 2 (Đồng hồ) và nhấn chuột phải!')
               } catch (e) {
                 console.log('Lỗi khi dùng item:', e.message)
@@ -86,36 +84,53 @@ function startBot() {
     }, CONFIG.DELAY_AFTER_SPAWN)
   })
 
-  // BƯỚC 4: CLICK SLOT 24 KHI MENU MỞ
+  // BƯỚC 4: CLICK VÀO SLOT 24 (CÓ CƠ CHẾ THỬ LẠI NẾU SERVER BỎ QUA)
   bot.on('windowOpen', async (window) => {
     if (inGame) return
 
     isMenuOpen = true
-    // Dừng dùng đồng hồ ngay lập tức khi Menu vừa bật lên
-    if (actionInterval) clearInterval(actionInterval) 
+    if (actionInterval) clearInterval(actionInterval) // Dừng dùng đồng hồ ngay khi menu mở
 
     console.log(`-> MENU ĐÃ MỞ: "${window.title || 'GUI'}". Đang chờ load item...`)
 
-    // Chờ GUI đồng bộ item từ Server
+    // Chờ 2s đảm bảo item trong GUI đã được Server gửi về đầy đủ
     await new Promise(resolve => setTimeout(resolve, CONFIG.DELAY_AFTER_MENU_OPEN))
 
-    console.log(`=== [BƯỚC 4] THỰC HIỆN CLICK VÀO Ô THỨ ${CONFIG.SLOT_TO_CLICK} ===`)
+    // Kiểm tra thông tin vật phẩm ở ô Slot 24
+    const targetItem = window.slots[CONFIG.SLOT_TO_CLICK]
+    const itemName = targetItem ? (targetItem.displayName || targetItem.name) : 'Ô trống'
+    console.log(`-> Vật phẩm tại Slot ${CONFIG.SLOT_TO_CLICK}: [${itemName}]`)
 
-    try {
-      await bot.clickWindow(CONFIG.SLOT_TO_CLICK, 0, 0)
-      console.log(`=== [THÀNH CÔNG] ĐÃ CLICK VÀO SLOT ${CONFIG.SLOT_TO_CLICK}! ===`)
+    // Hàm thực hiện click (hỗ trợ thử lại nếu chưa chuyển server)
+    const attemptClick = async (retryCount = 1) => {
+      if (inGame || !bot.currentWindow) return
 
-      inGame = true
-      isMenuOpen = false
+      console.log(`=== [BƯỚC 4] THỰC HIỆN CLICK SLOT ${CONFIG.SLOT_TO_CLICK} (Lần ${retryCount}) ===`)
 
-    } catch (err) {
-      console.error('[LỖI CLICK]:', err.message || err)
-      isMenuOpen = false // Cho phép thử lại nếu lỡ bị lỗi click
+      try {
+        await bot.clickWindow(CONFIG.SLOT_TO_CLICK, 0, 0)
+
+        // Hẹn giờ 1.5s sau: Nếu Menu vẫn còn mở nghĩa là Server chưa cho qua -> Click lại lần nữa
+        setTimeout(() => {
+          if (!inGame && bot.currentWindow && retryCount < 4) {
+            console.log(`-> Menu vẫn chưa đóng/chuyển server. Thử click lại lần ${retryCount + 1}...`)
+            attemptClick(retryCount + 1)
+          }
+        }, 1500)
+
+      } catch (err) {
+        console.error('[LỖI CLICK]:', err.message || err)
+        isMenuOpen = false
+      }
     }
+
+    // Chạy click lần đầu
+    attemptClick(1)
   })
 
+  // Khi chuyển Server thành công, Menu sẽ đóng và trigger sự kiện respawn/chuyển world
   bot.on('respawn', () => {
-    console.log('=== THÀNH CÔNG: BOT ĐÃ CHUYỂN SERVER VÀO GAME! ===')
+    console.log('=== HOÀN TẤT: BOT ĐÃ CHUYỂN SERVER THÀNH CÔNG VÀO GAME! ===')
     inGame = true
     isMenuOpen = false
     if (actionInterval) clearInterval(actionInterval)
