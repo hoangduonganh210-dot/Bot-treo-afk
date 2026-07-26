@@ -10,18 +10,18 @@ const CONFIG = {
   HOST: 'sgp.kingmc.vn',         // IP Server
   PORT_MC: 25565,                // Port Server
   VERSION: '1.20.4',             // Phiên bản Minecraft
-  SLOT_TO_CLICK: 24,             // Ô cần click trong /menu (đếm từ 0)
+  SLOT_TO_CLICK: 24,             // Ô cái đầu ở hàng 3 (Slot 24)
   
   // Thời gian cấu hình (tính bằng mili-giây)
-  DELAY_AFTER_SPAWN: 2000,      // Chờ 2s sau khi vào lobby mới bắt đầu gửi lệnh
-  INTERVAL_RETRY_MENU: 5000,    // Thử lại mỗi 5 giây (tránh bị spam-kick)
-  DELAY_AFTER_MENU_OPEN: 1500,  // Thời gian chờ menu load item rồi mới click (1.5s)
-  RECONNECT_DELAY: 15000,       // Thời gian chờ kết nối lại (15s)
+  DELAY_AFTER_SPAWN: 2000,      // Chờ 2s sau khi spawn mới bắt đầu
+  INTERVAL_RETRY_USE_CLOCK: 4000,// Thử kích hoạt Đồng hồ mỗi 4 giây
+  DELAY_AFTER_MENU_OPEN: 1500,  // Chờ 1.5s cho GUI đồng bộ item rồi mới click
+  RECONNECT_DELAY: 15000,       // Thời gian kết nối lại khi mất mạng
   WEB_PORT: process.env.PORT || 3000 // Port Web Server cho Render 24/7
 }
 
 // ===================================================
-// WEB SERVER GIỮ BOT AFK ONLINE 24/7 TRÊN RENDER
+// WEB SERVER GIỮ BOT ONLINE 24/7 TRÊN RENDER
 // ===================================================
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
@@ -50,7 +50,6 @@ function startBot() {
   let inGame = false
   let isMenuOpen = false
 
-  // BƯỚC 2: JOIN SERVER
   bot.on('login', () => {
     console.log(`=== [BƯỚC 2] ${CONFIG.USERNAME} ĐÃ KẾT NỐI VÀO LOBBY ===`)
   })
@@ -58,48 +57,46 @@ function startBot() {
   bot.on('spawn', () => {
     if (inGame) return
 
-    console.log('-> Đã spawn tại sảnh chờ. Chuẩn bị chạy tiến trình đăng nhập & mở menu...')
+    console.log('-> Đã spawn tại sảnh. Chuẩn bị đăng nhập & dùng Đồng hồ...')
 
-    // Dừng vòng lặp cũ nếu có
     if (actionInterval) clearInterval(actionInterval)
 
-    // Chờ 2s ổn định kết nối rồi bắt đầu vòng lặp
     setTimeout(() => {
       actionInterval = setInterval(() => {
         if (!inGame && !isMenuOpen) {
-          console.log('=== [BƯỚC 3] GỬI LỆNH ĐĂNG NHẬP VÀ MỞ MENU ===')
+          console.log('=== [BƯỚC 3] ĐĂNG NHẬP VÀ KÍCH HOẠT ĐỒNG HỒ ===')
           
-          // 1. Luôn gửi lệnh đăng nhập lại phòng trường hợp chưa ăn lệnh
+          // 1. Gửi lệnh đăng nhập
           bot.chat(`/dn ${CONFIG.PASSWORD}`)
-          
-          // 2. Chờ 500ms rồi mới gửi /menu
+
+          // 2. Chuyển sang ô ĐỒNG HỒ (Slot index 2 trên Hotbar) và Bấm chuột phải
           setTimeout(() => {
             if (!inGame && !isMenuOpen) {
-              bot.chat('/menu')
-
-              // 3. Chuột phải item slot 0 (La bàn/Cần câu mở menu nếu có)
               try {
-                bot.setQuickBarSlot(0)
-                bot.activateItem()
-              } catch (e) {}
+                bot.setQuickBarSlot(2) // Ô thứ 3 từ trái sang (Index 2)
+                bot.activateItem()     // Chuột phải dùng Đồng hồ
+                console.log('-> Đã chọn Slot 2 (Đồng hồ) và nhấn chuột phải!')
+              } catch (e) {
+                console.log('Lỗi khi dùng item:', e.message)
+              }
             }
           }, 500)
         }
-      }, CONFIG.INTERVAL_RETRY_MENU)
+      }, CONFIG.INTERVAL_RETRY_USE_CLOCK)
     }, CONFIG.DELAY_AFTER_SPAWN)
   })
 
-  // BƯỚC 4: CHỌN Ô THỨ 24 (ĐẾM TỪ 0)
+  // BƯỚC 4: CLICK SLOT 24 KHI MENU MỞ
   bot.on('windowOpen', async (window) => {
     if (inGame) return
 
     isMenuOpen = true
-    console.log(`-> MENU ĐÃ MỞ: "${window.title}". Dừng vòng lặp, chờ load item...`)
+    // Dừng dùng đồng hồ ngay lập tức khi Menu vừa bật lên
+    if (actionInterval) clearInterval(actionInterval) 
 
-    // Dừng ngay việc gửi lệnh
-    if (actionInterval) clearInterval(actionInterval)
+    console.log(`-> MENU ĐÃ MỞ: "${window.title || 'GUI'}". Đang chờ load item...`)
 
-    // Chờ GUI đồng bộ vật phẩm từ Server
+    // Chờ GUI đồng bộ item từ Server
     await new Promise(resolve => setTimeout(resolve, CONFIG.DELAY_AFTER_MENU_OPEN))
 
     console.log(`=== [BƯỚC 4] THỰC HIỆN CLICK VÀO Ô THỨ ${CONFIG.SLOT_TO_CLICK} ===`)
@@ -110,21 +107,20 @@ function startBot() {
 
       inGame = true
       isMenuOpen = false
+
     } catch (err) {
       console.error('[LỖI CLICK]:', err.message || err)
-      isMenuOpen = false // Nếu click lỗi thì mở cờ cho phép thử lại
+      isMenuOpen = false // Cho phép thử lại nếu lỡ bị lỗi click
     }
   })
 
-  // Tắt luồng Lobby khi đã chuyển server thành công
   bot.on('respawn', () => {
-    console.log('=== HOÀN TẤT: BOT ĐÃ CHUYỂN SERVER THÀNH CÔNG! ===')
+    console.log('=== THÀNH CÔNG: BOT ĐÃ CHUYỂN SERVER VÀO GAME! ===')
     inGame = true
     isMenuOpen = false
     if (actionInterval) clearInterval(actionInterval)
   })
 
-  // Tự động kết nối lại khi bị disconnect
   bot.on('end', () => {
     console.log(`Mất kết nối! Sẽ kết nối lại sau ${CONFIG.RECONNECT_DELAY / 1000}s...`)
     inGame = false
