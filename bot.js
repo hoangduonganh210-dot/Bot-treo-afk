@@ -3,7 +3,7 @@ const http = require('http')
 
 const PASSWORD = 'TrinhHoangYen' 
 
-// 1. Web Server ảo để Render nhận diện bot chạy 24/7
+// Web Server ảo duy trì Render 24/7
 const PORT = process.env.PORT || 3000
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
@@ -28,6 +28,7 @@ function startBot() {
   let afkInterval
   let actionInterval
   let inGame = false
+  let isMenuOpen = false // Cờ kiểm tra trạng thái Menu đang mở
 
   bot.on('login', () => {
     console.log('=== KẾT NỐI MẠNG THÀNH CÔNG (BOT ONLINE) ===')
@@ -36,25 +37,25 @@ function startBot() {
   bot.on('spawn', () => {
     if (inGame) return
 
-    console.log('=== VÀO SẢNH: ĐĂNG NHẬP VÀ MỞ MENU (/menu)... ===')
+    console.log('=== VÀO SẢNH CHỜ: ĐĂNG NHẬP VÀ MỞ MENU ===')
 
-    // 1. Gửi lệnh đăng nhập ban đầu
+    // Gửi lệnh đăng nhập lần đầu
     setTimeout(() => {
       bot.chat(`/dn ${PASSWORD}`)
-      console.log('-> Gửi lệnh /dn...')
+      console.log('-> Đã gửi lệnh /dn ban đầu.')
     }, 2000)
 
-    // 2. Định kỳ gửi /dn và /menu mỗi 5 giây nếu chưa vào được game
+    // Nếu chưa vào game VÀ Menu chưa mở thì mới định kỳ gửi lệnh
     if (actionInterval) clearInterval(actionInterval)
     actionInterval = setInterval(() => {
-      if (inGame) return
+      if (!inGame && !isMenuOpen) {
+        console.log('-> Đang gửi /dn và thử mở /menu...')
+        bot.chat(`/dn ${PASSWORD}`)
+        bot.chat('/menu')
+      }
+    }, 4000)
 
-      console.log('-> Đang thử lại: Gửi /dn và mở /menu...')
-      bot.chat(`/dn ${PASSWORD}`)
-      bot.chat('/menu') // Lệnh mở Menu
-    }, 5000)
-
-    // 3. Cơ chế Anti-AFK cơ bản
+    // Anti-AFK
     if (afkInterval) clearInterval(afkInterval)
     afkInterval = setInterval(() => {
       if (!bot.entity) return
@@ -63,33 +64,36 @@ function startBot() {
     }, 20000)
   })
 
-  // 4. LẮNG NGHE SỰ KIỆN MỞ MENU -> CLICK CHUỘT TRÁI VÀO SLOT 24
-  bot.on('windowOpen', (window) => {
+  // LẮNG NGHE SỰ KIỆN MỞ MENU
+  bot.on('windowOpen', async (window) => {
     if (inGame) return
 
-    console.log(`[BOT] Đã mở giao diện: ${window.title || 'Menu/Chest'}`)
+    isMenuOpen = true // Đánh dấu Menu đã mở -> Tạm dừng spam /menu
+    console.log(`=== MENU ĐÃ MỞ! ĐANG CHỜ 1 GIÂY ĐỂ CLICK SLOT 24... ===`)
 
-    const slotToClick = 24  // Ô số 24 bạn cần click
-    const mouseButton = 0  // 0: Chuột trái
-    const clickMode = 0    // 0: Click đơn thông thường
+    // Chờ 1 giây ổn định giao diện
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Trễ 0.5 giây cho an toàn và tránh bị chống hack/spam block
-    setTimeout(() => {
-      bot.clickWindow(slotToClick, mouseButton, clickMode, (err) => {
-        if (err) {
-          console.error(`[LỖI] Không thể click vào ô số 24:`, err.message)
-        } else {
-          console.log(`=== [BOT] ĐÃ CLICK CHUỘT TRÁI VÀO Ô SỐ 24 THÀNH CÔNG! ===`)
-          inGame = true
-          if (actionInterval) clearInterval(actionInterval)
-        }
-      })
-    }, 500)
+    const slotToClick = 24  // Ô số 24 
+    const mouseButton = 0  // Chuột trái
+    const clickMode = 0    // Click đơn
+
+    console.log(`-> Tiến hành click chuột trái vào Slot ${slotToClick}...`)
+    
+    bot.clickWindow(slotToClick, mouseButton, clickMode, (err) => {
+      if (err) {
+        console.error(`[LỖI CLICK]:`, err.message)
+        isMenuOpen = false // Nếu click lỗi thì cho phép mở lại menu
+      } else {
+        console.log(`=== [THÀNH CÔNG] ĐÃ CLICK SLOT 24 THÀNH CÔNG! ===`)
+        inGame = true
+        if (actionInterval) clearInterval(actionInterval)
+      }
+    })
   })
 
-  // 5. Xử lý chuyển server / ngắt kết nối
   bot.on('respawn', () => {
-    console.log('=== BOT ĐÃ CHUYỂN SERVER / RESPAWN THÀNH CÔNG! ===')
+    console.log('=== BOT ĐÃ RESPAWN / CHUYỂN SERVER THÀNH CÔNG! ===')
     inGame = true
     if (actionInterval) clearInterval(actionInterval)
   })
@@ -103,8 +107,9 @@ function startBot() {
   })
 
   bot.on('end', () => {
-    console.log('Mất kết nối! Đang tự động kết nối lại sau 20 giây...')
+    console.log('Mất kết nối! Tự động kết nối lại sau 20 giây...')
     inGame = false
+    isMenuOpen = false
     if (actionInterval) clearInterval(actionInterval)
     if (afkInterval) clearInterval(afkInterval)
     setTimeout(startBot, 20000)
