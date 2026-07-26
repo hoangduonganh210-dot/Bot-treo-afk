@@ -43,7 +43,8 @@ function startBot() {
 
   let inGame = false
   let isLoggedIn = false
-  let clockInterval = null
+  let isMenuOpening = false
+  let clockTimeout = null
 
   bot.on('login', () => {
     console.log(`=== [BƯỚC 2] ${CONFIG.USERNAME} ĐÃ KẾT NỐI VÀO LOBBY ===`)
@@ -54,7 +55,6 @@ function startBot() {
 
     console.log('-> Đã spawn tại sảnh. Tiến hành đăng nhập...')
 
-    // Đăng nhập sau 3s spawn
     setTimeout(() => {
       if (!inGame && !isLoggedIn) {
         console.log('=== [BƯỚC 3] GỬI LỆNH ĐĂNG NHẬP ===')
@@ -70,84 +70,74 @@ function startBot() {
     if (message.includes('Đăng nhập thành công') || message.includes('Bạn đã đăng nhập') || message.includes('thành công')) {
       if (isLoggedIn || inGame) return
       isLoggedIn = true
-      console.log('=== ĐÃ ĐĂNG NHẬP THÀNH CÔNG! CHỜ 3S ĐỂ MỞ MENU... ===')
+      console.log('=== ĐÃ ĐĂNG NHẬP THÀNH CÔNG! CHỜ 3S ĐỂ BẤM ĐỒNG HỒ... ===')
 
-      // Đợi hẳn 3.5 giây cho server ổn định tránh anti-bot kick
-      setTimeout(startUsingClock, 3500)
+      setTimeout(triggerClock, 3000)
     }
   })
 
-  // Bắt đầu dùng Đồng hồ (có cơ chế thử lại nhẹ nhàng)
-  function startUsingClock() {
-    if (inGame || bot.currentWindow) return
+  // Hàm bấm Đồng hồ (Đúng 1 lần, chỉ thử lại sau 6s nếu chưa mở được Menu)
+  function triggerClock() {
+    if (inGame || bot.currentWindow || isMenuOpening) return
 
-    if (clockInterval) clearInterval(clockInterval)
+    console.log('-> Cầm Đồng hồ (Slot 2) và bấm chuột phải (Duy nhất 1 lần)...')
+    isMenuOpening = true
 
-    clockInterval = setInterval(() => {
-      if (inGame || bot.currentWindow) {
-        clearInterval(clockInterval)
-        return
-      }
+    try {
+      bot.setQuickBarSlot(2) // Slot 2 (Ô thứ 3 Hotbar)
 
-      console.log('-> Cầm Đồng hồ (Slot 2) và nhấn chuột phải...')
-      try {
-        // Nhảy nhẹ 1 cái để bypass anti-bot
-        bot.setControlState('jump', true)
-        setTimeout(() => bot.setControlState('jump', false), 200)
+      setTimeout(() => {
+        if (!inGame && !bot.currentWindow) {
+          bot.activateItem()
+        }
+      }, 500)
 
-        // Chọn Slot 2
-        bot.setQuickBarSlot(2)
+      // Hẹn giờ phòng trường hợp bấm trượt, 6 giây sau nếu chưa mở được Menu thì thử lại
+      if (clockTimeout) clearTimeout(clockTimeout)
+      clockTimeout = setTimeout(() => {
+        if (!inGame && !bot.currentWindow) {
+          console.log('-> Chưa thấy Menu mở, bấm lại Đồng hồ...')
+          isMenuOpening = false
+          triggerClock()
+        }
+      }, 6000)
 
-        // Dùng item sau khi đã chuyển slot 0.8s
-        setTimeout(() => {
-          if (!inGame && !bot.currentWindow) {
-            bot.activateItem()
-          }
-        }, 800)
-
-      } catch (err) {
-        console.log('Lỗi thao tác item:', err.message)
-      }
-    }, 4000) // Thử lại mỗi 4 giây nếu Menu chưa mở
+    } catch (err) {
+      console.log('Lỗi dùng item:', err.message)
+      isMenuOpening = false
+    }
   }
 
-  // BƯỚC 4: BẮT SỰ KIỆN MENU MỞ VÀ CLICK SLOT 24
+  // BƯỚC 4: BẮT SỰ KIỆN MENU MỜ VÀ CLICK SLOT 24
   bot.on('windowOpen', (window) => {
     if (inGame) return
 
-    if (clockInterval) clearInterval(clockInterval) // Mở được Menu thì dừng bấm Đồng hồ ngay
+    isMenuOpening = false
+    if (clockTimeout) clearTimeout(clockTimeout) // Hủy ngay lịch bấm lại Đồng hồ!
 
-    console.log(`=== [BƯỚC 4] MENU ĐÃ MỞ: "${window.title || 'GUI'}" ===`)
+    console.log(`=== [BƯỚC 4] MENU ĐÃ MỜ THÀNH CÔNG! ===`)
 
-    // Hàm kiểm tra và click Slot 24
-    const tryClickTargetSlot = async () => {
+    // Hàm thực hiện click Slot 24
+    const doClickSlot = async () => {
       if (inGame || !bot.currentWindow) return
 
-      const targetItem = window.slots[CONFIG.SLOT_TO_CLICK]
-      
-      if (targetItem && targetItem.type !== null) {
-        const itemName = targetItem.displayName || targetItem.name
-        console.log(`=== [ITEM ĐÃ LOAD] Slot ${CONFIG.SLOT_TO_CLICK}: [${itemName}] -> CLICK! ===`)
-
-        try {
-          await bot.clickWindow(CONFIG.SLOT_TO_CLICK, 0, 0)
-          console.log(`=== [THÀNH CÔNG] ĐÃ CLICK VÀO SLOT ${CONFIG.SLOT_TO_CLICK}! ===`)
-        } catch (err) {
-          console.error('[LỖI CLICK]:', err.message)
-        }
-      } else {
-        console.log(`-> Slot ${CONFIG.SLOT_TO_CLICK} chưa load item, đang đợi...`)
+      console.log(`=== THỰC HIỆN CLICK VÀO SLOT ${CONFIG.SLOT_TO_CLICK}... ===`)
+      try {
+        await bot.clickWindow(CONFIG.SLOT_TO_CLICK, 0, 0)
+        console.log(`=== [THÀNH CÔNG] ĐÃ CLICK SLOT ${CONFIG.SLOT_TO_CLICK}! ===`)
+      } catch (err) {
+        console.error('[LỖI CLICK]:', err.message)
       }
     }
 
-    // Thử click sau 1.5s
-    setTimeout(tryClickTargetSlot, 1500)
+    // Chờ 1.5s cho GUI đồng bộ hoàn toàn rồi click
+    setTimeout(doClickSlot, 1500)
 
-    // Bắt sự kiện khi item load vào Slot 24
+    // Bắt thêm sự kiện nếu server load item muộn
     window.on('updateSlot', (slot, oldItem, newItem) => {
       if (slot === CONFIG.SLOT_TO_CLICK && newItem) {
-        console.log('-> Slot 24 vừa được server gửi item tới!')
-        tryClickTargetSlot()
+        console.log('-> Slot 24 nhận item mới từ Server!')
+        doClickSlot()
       }
     })
   })
@@ -156,14 +146,16 @@ function startBot() {
   bot.on('respawn', () => {
     console.log('=== HOÀN TẤT: BOT ĐÃ CHUYỂN SERVER VÀO GAME! ===')
     inGame = true
-    if (clockInterval) clearInterval(clockInterval)
+    isMenuOpening = false
+    if (clockTimeout) clearTimeout(clockTimeout)
   })
 
   bot.on('end', () => {
     console.log(`Mất kết nối! Sẽ kết nối lại sau ${CONFIG.RECONNECT_DELAY / 1000}s...`)
     inGame = false
     isLoggedIn = false
-    if (clockInterval) clearInterval(clockInterval)
+    isMenuOpening = false
+    if (clockTimeout) clearTimeout(clockTimeout)
     setTimeout(startBot, CONFIG.RECONNECT_DELAY)
   })
 
